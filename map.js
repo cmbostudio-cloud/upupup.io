@@ -36,9 +36,12 @@
     const STICK_HEIGHT = 18;
     const STICK_LENGTH = Math.round(210 * 1.33);
     const WALL_STICK_LENGTH = STICK_LENGTH;
+    const MIN_STICK_X_GAP = Math.round(STICK_LENGTH * 0.5);
+    const RECENT_RANDOM_STICKS = 3;
 
     let nextSpawnY = GROUND_Y - 780;
     let pathX = Math.round(MAP_W * 0.5);
+    const recentRandomStickXs = [];
 
     function randRange(min, max) {
       return min + Math.random() * (max - min);
@@ -46,6 +49,60 @@
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
+    }
+
+    function rememberRandomStickX(x) {
+      recentRandomStickXs.push(x);
+      while (recentRandomStickXs.length > RECENT_RANDOM_STICKS) {
+        recentRandomStickXs.shift();
+      }
+    }
+
+    function isFarEnoughFromRecentRandomSticks(x) {
+      return recentRandomStickXs.every((prevX) => Math.abs(x - prevX) >= MIN_STICK_X_GAP);
+    }
+
+    function pickSeparatedStickX(preferredX, width) {
+      const minX = 48;
+      const maxX = MAP_W - width - 48;
+      const targetX = clamp(preferredX, minX, maxX);
+      const spread = Math.max(MIN_STICK_X_GAP * 1.75, 170);
+
+      for (let i = 0; i < 24; i++) {
+        const candidate = clamp(targetX + randRange(-spread, spread), minX, maxX);
+        if (isFarEnoughFromRecentRandomSticks(candidate)) {
+          return Math.round(candidate);
+        }
+      }
+
+      const anchors = [
+        minX,
+        minX + (maxX - minX) * 0.25,
+        minX + (maxX - minX) * 0.5,
+        minX + (maxX - minX) * 0.75,
+        maxX,
+      ];
+
+      let bestX = Math.round(targetX);
+      let bestScore = -Infinity;
+      for (const anchor of anchors) {
+        const score = recentRandomStickXs.reduce(
+          (minDistance, prevX) => Math.min(minDistance, Math.abs(anchor - prevX)),
+          Infinity
+        );
+        if (score > bestScore) {
+          bestScore = score;
+          bestX = Math.round(anchor);
+        }
+      }
+      return bestX;
+    }
+
+    function addRandomStick(preferredX, y, width, height) {
+      const x = pickSeparatedStickX(preferredX, width);
+      addStick(x, y, width, height);
+      rememberRandomStickX(x);
+      return x;
     }
 
     function removeFromArray(list, item) {
@@ -95,6 +152,7 @@
         Math.max(1, capRadius - 2)
       );
       stick.endFill();
+      stick.hitArea = new PIXI.RoundedRectangle(x, y, width, height, capRadius);
       chunk.container.addChild(stick);
 
       const surface = { x, y, width, height, radius: capRadius, chunk };
@@ -106,6 +164,7 @@
       const chunk = ensureChunk(getChunkIndex(centerY));
       const bladeLength = Math.round(92 * scale * 1.5);
       const bladeThickness = Math.max(8, Math.round(12 * scale));
+      const hubRadius = Math.max(8, Math.round(10 * scale));
 
       const blades = new PIXI.Container();
       blades.x = centerX;
@@ -130,7 +189,7 @@
 
       const hub = new PIXI.Graphics();
       hub.beginFill(0x111111);
-      hub.drawCircle(0, 0, Math.max(8, Math.round(10 * scale)));
+      hub.drawCircle(0, 0, hubRadius);
       hub.endFill();
       blades.addChild(hub);
 
@@ -141,6 +200,7 @@
         centerY,
         bladeLength,
         bladeThickness,
+        hubRadius,
         bladeOffsets,
         speed: randRange(0.005, 0.01) * (Math.random() < 0.5 ? -1 : 1),
         chunk,
@@ -161,16 +221,15 @@
 
     function addPathStep(y) {
       const width = STICK_LENGTH;
-      pathX = clamp(pathX + randRange(-110, 110), 48, MAP_W - width - 48);
-      addStick(Math.round(pathX), Math.round(y), width, STICK_HEIGHT);
+      pathX = addRandomStick(pathX + randRange(-110, 110), Math.round(y), width, STICK_HEIGHT);
 
       if (Math.random() < 0.14) {
-        const sideX = clamp(
+        addRandomStick(
           pathX + randRange(-180, 180),
-          48,
-          MAP_W - width - 48
+          Math.round(y - randRange(100, 150)),
+          width,
+          STICK_HEIGHT
         );
-        addStick(Math.round(sideX), Math.round(y - randRange(100, 150)), width, STICK_HEIGHT);
       }
 
       if (Math.random() < 0.12) {
@@ -266,6 +325,8 @@
 
     addStick(140, 1840, STICK_LENGTH, STICK_HEIGHT);
     addStick(490, 1500, STICK_LENGTH, STICK_HEIGHT);
+    rememberRandomStickX(140);
+    rememberRandomStickX(490);
     addWallStick('left', 1710);
     addWallStick('right', 1380);
     addWindmill(190, 1560, 0.95);

@@ -59,6 +59,20 @@
     return px >= rect.left && px <= rect.right && py >= rect.top && py <= rect.bottom;
   }
 
+  function closestPointOnRect(px, py, rect) {
+    return {
+      x: Math.max(rect.left, Math.min(rect.right, px)),
+      y: Math.max(rect.top, Math.min(rect.bottom, py)),
+    };
+  }
+
+  function pointRectDistanceSq(px, py, rect) {
+    const closest = closestPointOnRect(px, py, rect);
+    const dx = px - closest.x;
+    const dy = py - closest.y;
+    return dx * dx + dy * dy;
+  }
+
   function pointSegmentDistanceSq(px, py, ax, ay, bx, by) {
     const dx = bx - ax;
     const dy = by - ay;
@@ -156,6 +170,34 @@
 
     for (const windmill of windmills) {
       const bladeRadius = windmill.bladeThickness * 0.5;
+      const hubRadius = windmill.hubRadius ?? 10;
+      const hubThreshold = player.radius + hubRadius;
+      const hubDistSq = pointRectDistanceSq(windmill.centerX, windmill.centerY, coreRect);
+      if (hubDistSq <= hubThreshold * hubThreshold && (!best || hubDistSq < best.distSq)) {
+        const closest = closestPointOnRect(windmill.centerX, windmill.centerY, coreRect);
+        let normalX = windmill.centerX - closest.x;
+        let normalY = windmill.centerY - closest.y;
+        let normalLen = Math.hypot(normalX, normalY);
+        if (normalLen < 0.001) {
+          normalX = centerX - windmill.centerX;
+          normalY = centerY - windmill.centerY;
+          normalLen = Math.hypot(normalX, normalY) || 1;
+        }
+        normalX /= normalLen;
+        normalY /= normalLen;
+        best = {
+          distSq: hubDistSq,
+          threshold: hubThreshold,
+          closestX: closest.x,
+          closestY: closest.y,
+          normalX,
+          normalY,
+          bladeVelX: 0,
+          bladeVelY: 0,
+          windmill,
+        };
+      }
+
       for (const offset of windmill.bladeOffsets) {
         const angle = windmill.blades.rotation + offset;
         const ax = windmill.centerX;
@@ -226,7 +268,7 @@
 
       this.gfx.eventMode = 'static';
       this.gfx.cursor = 'grab';
-      this.gfx.hitArea = new PIXI.Rectangle(-18, -18, this.size + 36, this.size + 36);
+      this.gfx.hitArea = new PIXI.RoundedRectangle(0, 0, this.size, this.size, this.ctx.PLAYER_RADIUS);
       this.gfx.on('pointerdown', (e) => this.onDown(e));
     }
 
