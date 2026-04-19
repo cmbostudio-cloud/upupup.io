@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>upupup.io</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f0ece4;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #game-canvas {
+    display: block;
+    width: 100vw;
+    height: 100dvh;
+    touch-action: none;
+  }
+  #settings-btn {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 20;
+    border: 2px solid #1a1a1a;
+    background: #f7f1e6;
+    color: #1a1a1a;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 8px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #1a1a1a;
+    touch-action: manipulation;
+  }
+  #settings-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #1a1a1a;
+  }
+  @media (pointer: coarse) {
+    #settings-btn {
+      top: max(14px, env(safe-area-inset-top));
+      right: max(14px, env(safe-area-inset-right));
+      font-size: 16px;
+      padding: 10px 14px;
+    }
+  }
+</style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+<button id="settings-btn" type="button">GRID ON</button>
+<script src="./logic.js"></script>
+<script src="./map.js"></script>
+<script src="./game.js"></script>
+</body>
+</html>
