@@ -2,8 +2,17 @@
   const { Square } = window.UpUpUpLogic;
   const { buildMap } = window.UpUpUpMap;
 
-  let CANVAS_W = window.innerWidth;
-  let CANVAS_H = window.innerHeight;
+  function getViewportSize() {
+    const viewport = window.visualViewport;
+    const width = Math.round(viewport?.width ?? window.innerWidth);
+    const height = Math.round(viewport?.height ?? window.innerHeight);
+    return {
+      width: Math.max(1, width),
+      height: Math.max(1, height),
+    };
+  }
+
+  let { width: CANVAS_W, height: CANVAS_H } = getViewportSize();
   const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
   const PIXEL_RATIO = IS_TOUCH_DEVICE
     ? Math.min(window.devicePixelRatio || 1, 1.5)
@@ -44,18 +53,70 @@
   let player = null;
   let scoreText = null;
   let gridVisible = true;
+  let activeMap = null;
+  let cameraZoom = 1;
+  let cameraLeft = 0;
+  let cameraTop = 0;
 
-  function centerWorldX() {
-    return Math.round(CANVAS_W * 0.5 - MAP_W * 0.5);
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function getCameraZoom() {
+    if (!IS_TOUCH_DEVICE) return 1;
+    return Math.min(1, CANVAS_W / MAP_W);
+  }
+
+  function getVisibleWorldWidth() {
+    return CANVAS_W / cameraZoom;
+  }
+
+  function getVisibleWorldHeight() {
+    return CANVAS_H / cameraZoom;
+  }
+
+  function syncCamera(immediate = false) {
+    if (!player) return;
+
+    cameraZoom = getCameraZoom();
+    const visibleWidth = getVisibleWorldWidth();
+    const visibleHeight = getVisibleWorldHeight();
+    const playerCenterX = player.gfx.x + player.size / 2;
+    const playerCenterY = player.gfx.y + player.size / 2;
+    const targetLeft = visibleWidth >= MAP_W
+      ? (MAP_W - visibleWidth) / 2
+      : clamp(playerCenterX - visibleWidth / 2, 0, MAP_W - visibleWidth);
+    const targetTop = playerCenterY - visibleHeight / 2;
+
+    if (immediate) {
+      cameraLeft = targetLeft;
+      cameraTop = targetTop;
+    } else {
+      cameraLeft += (targetLeft - cameraLeft) * 0.12;
+      cameraTop += (targetTop - cameraTop) * 0.1;
+    }
+
+    world.scale.set(cameraZoom);
+    world.x = -cameraLeft * cameraZoom;
+    world.y = -cameraTop * cameraZoom;
+    if (scoreText) {
+      scoreText.x = CANVAS_W / 2;
+    }
   }
 
   function resizeCanvas() {
-    CANVAS_W = window.innerWidth;
-    CANVAS_H = window.innerHeight;
+    const viewport = getViewportSize();
+    CANVAS_W = viewport.width;
+    CANVAS_H = viewport.height;
     app.renderer.resize(CANVAS_W, CANVAS_H);
-    world.x = centerWorldX();
+    syncCamera(true);
     if (scoreText) {
       scoreText.x = CANVAS_W / 2;
+    }
+    if (player) {
+      activeMap = syncToCamera(cameraTop, cameraTop + getVisibleWorldHeight(), gridVisible);
+      player.ctx.stickSurfaces = activeMap.stickSurfaces;
+      player.ctx.windmills = activeMap.windmills;
     }
   }
 
@@ -72,9 +133,6 @@
     PLAYER_RADIUS,
     PLAYER_BORDER,
   }, MAP_W / 2, GROUND_Y - 44);
-
-  world.x = centerWorldX();
-  world.y = CANVAS_H / 2 - (player.gfx.y + player.size / 2);
 
   let score = 0;
   const scoreAnchorY = 14;
@@ -99,10 +157,7 @@
   }
 
   function followCamera() {
-    const ty = CANVAS_H / 2 - (player.gfx.y + player.size / 2);
-    world.x = centerWorldX();
-    world.y += (ty - world.y) * 0.1;
-    scoreText.x = CANVAS_W / 2;
+    syncCamera(false);
   }
 
   function setGridVisible(visible) {
@@ -117,7 +172,8 @@
   });
   setGridVisible(true);
 
-  let activeMap = syncToCamera(-world.y, -world.y + CANVAS_H, gridVisible);
+  syncCamera(true);
+  activeMap = syncToCamera(cameraTop, cameraTop + getVisibleWorldHeight(), gridVisible);
   player.ctx.stickSurfaces = activeMap.stickSurfaces;
   player.ctx.windmills = activeMap.windmills;
 
@@ -131,11 +187,15 @@
     player.update();
     updateScore();
     followCamera();
-    activeMap = syncToCamera(-world.y, -world.y + CANVAS_H, gridVisible);
+    activeMap = syncToCamera(cameraTop, cameraTop + getVisibleWorldHeight(), gridVisible);
     player.ctx.stickSurfaces = activeMap.stickSurfaces;
     player.ctx.windmills = activeMap.windmills;
   });
 
   window.addEventListener('resize', resizeCanvas);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', resizeCanvas);
+    window.visualViewport.addEventListener('scroll', resizeCanvas);
+  }
   resizeCanvas();
 })();
