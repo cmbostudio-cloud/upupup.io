@@ -32,7 +32,6 @@
     const CHUNK_HEIGHT = GRID * 8;
     const GENERATION_PAD = GRID * 16;
     const RENDER_PAD = GRID * 10;
-    const PRUNE_PAD = GRID * 28;
     const STICK_HEIGHT = 18;
     const STICK_LENGTH = Math.round(210 * 1.33);
     const WALL_STICK_LENGTH = STICK_LENGTH;
@@ -49,6 +48,15 @@
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
+    }
+
+    function getWindmillBladeLength(scale = 1) {
+      return Math.round(92 * scale * 1.5);
+    }
+
+    function getWindmillWallClearance(scale = 1) {
+      const bladeLength = getWindmillBladeLength(scale);
+      return bladeLength + 24;
     }
 
     function rememberRandomStickX(x) {
@@ -105,13 +113,6 @@
       return x;
     }
 
-    function removeFromArray(list, item) {
-      const index = list.indexOf(item);
-      if (index !== -1) {
-        list.splice(index, 1);
-      }
-    }
-
     function getChunkIndex(y) {
       return Math.floor(y / CHUNK_HEIGHT);
     }
@@ -162,12 +163,16 @@
 
     function addWindmill(centerX, centerY, scale = 1) {
       const chunk = ensureChunk(getChunkIndex(centerY));
-      const bladeLength = Math.round(92 * scale * 1.5);
+      const bladeLength = getWindmillBladeLength(scale);
       const bladeThickness = Math.max(8, Math.round(12 * scale));
       const hubRadius = Math.max(8, Math.round(10 * scale));
+      const wallClearance = getWindmillWallClearance(scale);
+      const safeMinX = wallClearance;
+      const safeMaxX = MAP_W - wallClearance;
+      const spawnX = safeMinX <= safeMaxX ? clamp(centerX, safeMinX, safeMaxX) : Math.round(MAP_W / 2);
 
       const blades = new PIXI.Container();
-      blades.x = centerX;
+      blades.x = spawnX;
       blades.y = centerY;
 
       const bladeStyle = 0x111111;
@@ -196,7 +201,7 @@
       chunk.container.addChild(blades);
       const windmill = {
         blades,
-        centerX,
+        centerX: spawnX,
         centerY,
         bladeLength,
         bladeThickness,
@@ -215,7 +220,8 @@
     }
 
     function addWallWindmill(side, y, scale = 1) {
-      const centerX = side === 'left' ? 28 : MAP_W - 28;
+      const wallClearance = getWindmillWallClearance(scale);
+      const centerX = side === 'left' ? wallClearance : MAP_W - wallClearance;
       addWindmill(centerX, Math.round(y), scale);
     }
 
@@ -233,12 +239,14 @@
       }
 
       if (Math.random() < 0.12) {
+        const scale = randRange(0.9, 1.08);
+        const wallClearance = getWindmillWallClearance(scale);
         const windmillX = clamp(
           pathX + width / 2 + randRange(-90, 90),
-          80,
-          MAP_W - 80
+          wallClearance,
+          MAP_W - wallClearance
         );
-        addWindmill(Math.round(windmillX), Math.round(y - randRange(80, 130)), randRange(0.9, 1.08));
+        addWindmill(Math.round(windmillX), Math.round(y - randRange(80, 130)), scale);
       }
 
       if (Math.random() < 0.18) {
@@ -287,38 +295,31 @@
       for (const chunk of chunks.values()) {
         const visible = chunk.bottom >= visibleTop && chunk.top <= visibleBottom;
         chunk.container.visible = visible;
-      }
-    }
-
-    function pruneFarBelow(cameraBottom) {
-      const cutoff = cameraBottom + PRUNE_PAD;
-      for (const [index, chunk] of chunks.entries()) {
-        if (chunk.top <= cutoff) continue;
-        world.removeChild(chunk.container);
-        chunk.container.destroy({ children: true });
-        for (const surface of chunk.stickSurfaces) {
-          removeFromArray(stickSurfaces, surface);
-        }
-        for (const windmill of chunk.windmills) {
-          removeFromArray(windmills, windmill);
-        }
-        chunks.delete(index);
+        chunk.container.renderable = visible;
       }
     }
 
     function getActiveObjects(cameraTop, cameraBottom) {
       const padTop = cameraTop - RENDER_PAD;
       const padBottom = cameraBottom + RENDER_PAD;
+      const activeStickSurfaces = [];
+      const activeWindmills = [];
+
+      for (const chunk of chunks.values()) {
+        if (chunk.bottom < padTop || chunk.top > padBottom) continue;
+        activeStickSurfaces.push(...chunk.stickSurfaces);
+        activeWindmills.push(...chunk.windmills);
+      }
+
       return {
-        stickSurfaces: stickSurfaces.filter((surface) => surface.y + surface.height >= padTop && surface.y <= padBottom),
-        windmills: windmills.filter((windmill) => windmill.centerY + windmill.bladeLength >= padTop && windmill.centerY - windmill.bladeLength <= padBottom),
+        stickSurfaces: activeStickSurfaces,
+        windmills: activeWindmills,
       };
     }
 
     function syncToCamera(cameraTop, cameraBottom, visible = true) {
       ensureGeneratedAbove(cameraTop - GENERATION_PAD);
       updateChunkVisibility(cameraTop, cameraBottom);
-      pruneFarBelow(cameraBottom);
       updateGrid(cameraTop, cameraBottom, visible);
       return getActiveObjects(cameraTop, cameraBottom);
     }

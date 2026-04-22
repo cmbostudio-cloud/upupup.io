@@ -157,6 +157,40 @@
     };
   }
 
+  function getStickCollisionCandidate(player, previousPlayer, surface) {
+    const currentLeft = player.x;
+    const currentRight = player.x + player.width;
+    const currentTop = player.y;
+    const currentBottom = player.y + player.height;
+    const surfaceLeft = surface.x;
+    const surfaceRight = surface.x + surface.width;
+    const surfaceTop = surface.y;
+    const surfaceBottom = surface.y + surface.height;
+
+    const overlapX = Math.min(currentRight, surfaceRight) - Math.max(currentLeft, surfaceLeft);
+    const overlapY = Math.min(currentBottom, surfaceBottom) - Math.max(currentTop, surfaceTop);
+    if (overlapX <= 0 || overlapY <= 0) return null;
+
+    const currentCenterX = currentLeft + player.width / 2;
+    const currentCenterY = currentTop + player.height / 2;
+    const previousCenterX = previousPlayer.x + previousPlayer.width / 2;
+    const previousCenterY = previousPlayer.y + previousPlayer.height / 2;
+    const surfaceCenterX = surfaceLeft + surface.width / 2;
+    const surfaceCenterY = surfaceTop + surface.height / 2;
+
+    if (overlapX < overlapY) {
+      const moveLeft = previousCenterX <= surfaceCenterX || currentCenterX <= surfaceCenterX;
+      return moveLeft
+        ? { side: 'left', restPos: surfaceLeft - player.width, penetration: overlapX }
+        : { side: 'right', restPos: surfaceRight, penetration: overlapX };
+    }
+
+    const moveUp = previousCenterY <= surfaceCenterY || currentCenterY <= surfaceCenterY;
+    return moveUp
+      ? { side: 'top', restPos: surfaceTop - player.height, penetration: overlapY }
+      : { side: 'bottom', restPos: surfaceBottom, penetration: overlapY };
+  }
+
   function getWindmillCollision(player, windmills) {
     const coreRect = {
       left: player.x + player.radius,
@@ -383,9 +417,19 @@
       this.gfx.y += this.vy;
       const RESTITUTION = 0.28;
       const GROUND_FRICTION = 0.84;
+      const WALL_RESTITUTION = 0.58;
+      const WALL_FRICTION = 0.88;
 
-      if (this.gfx.x < 0) { this.gfx.x = 0; this.vx = Math.abs(this.vx) * RESTITUTION; }
-      if (this.gfx.x + this.size > this.ctx.MAP_W) { this.gfx.x = this.ctx.MAP_W - this.size; this.vx = -Math.abs(this.vx) * RESTITUTION; }
+      if (this.gfx.x < 0) {
+        this.gfx.x = 0;
+        this.vx = Math.abs(this.vx) * WALL_RESTITUTION;
+        this.vy *= WALL_FRICTION;
+      }
+      if (this.gfx.x + this.size > this.ctx.MAP_W) {
+        this.gfx.x = this.ctx.MAP_W - this.size;
+        this.vx = -Math.abs(this.vx) * WALL_RESTITUTION;
+        this.vy *= WALL_FRICTION;
+      }
       const playerShape = {
         x: this.gfx.x,
         y: this.gfx.y,
@@ -401,114 +445,92 @@
         const push = overlap + 0.5;
         this.gfx.x += windmillHit.normalX * push;
         this.gfx.y += windmillHit.normalY * push;
-        if (windmillHit.normalY < -0.2 && this.vy >= 0) {
+        const relativeVx = this.vx - windmillHit.bladeVelX;
+        const relativeVy = this.vy - windmillHit.bladeVelY;
+        const normalSpeed = relativeVx * windmillHit.normalX + relativeVy * windmillHit.normalY;
+        if (windmillHit.normalY < -0.2 && normalSpeed <= 0.35) {
+          const tangentX = -windmillHit.normalY;
+          const tangentY = windmillHit.normalX;
+          const tangentialSpeed = relativeVx * tangentX + relativeVy * tangentY;
+          const blendedTangential = tangentialSpeed * 0.92;
+          this.vx = windmillHit.bladeVelX + tangentX * blendedTangential;
+          this.vy = windmillHit.bladeVelY + tangentY * blendedTangential;
           this.gfx.x += windmillHit.bladeVelX;
           this.gfx.y += windmillHit.bladeVelY;
-          this.vy = 0;
           supportedByWindmill = true;
-          this.vx += windmillHit.bladeVelX * 0.3;
-        } else {
-          this.vx = -this.vx * 0.45;
-          this.vy = -this.vy * 0.45;
+        } else if (normalSpeed < 0) {
+          this.vx -= windmillHit.normalX * normalSpeed;
+          this.vy -= windmillHit.normalY * normalSpeed;
         }
         playerShape.x = this.gfx.x;
         playerShape.y = this.gfx.y;
       }
 
-      let leftSurface = null;
-      let leftX = Infinity;
-      if (this.vx > 0) {
-        for (const surface of this.ctx.stickSurfaces) {
-          const contact = getRoundedRectLeftRestX(playerShape, surface);
-          if (contact === null) continue;
-          if (prevX <= contact && this.gfx.x >= contact && contact < leftX) {
-            leftSurface = surface;
-            leftX = contact;
-          }
-        }
-      }
+      let supportedByGround = false;
+      const previousShape = {
+        x: prevX,
+        y: prevY,
+        width: this.size,
+        height: this.size,
+        radius: this.ctx.PLAYER_RADIUS,
+      };
 
-      let rightSurface = null;
-      let rightX = -Infinity;
-      if (this.vx < 0) {
-        for (const surface of this.ctx.stickSurfaces) {
-          const contact = getRoundedRectRightRestX(playerShape, surface);
-          if (contact === null) continue;
-          if (prevX >= contact && this.gfx.x <= contact && contact > rightX) {
-            rightSurface = surface;
-            rightX = contact;
-          }
-        }
-      }
+      for (let pass = 0; pass < 4; pass++) {
+        const currentShape = {
+          x: this.gfx.x,
+          y: this.gfx.y,
+          width: this.size,
+          height: this.size,
+          radius: this.ctx.PLAYER_RADIUS,
+        };
 
-      if (leftSurface) {
-        this.gfx.x = leftX;
-        this.vx = 0;
-        playerShape.x = this.gfx.x;
-      } else if (rightSurface) {
-        this.gfx.x = rightX;
-        this.vx = 0;
-        playerShape.x = this.gfx.x;
-      }
-
-      let landingSurface = null;
-      let landingY = Infinity;
-      let landedOnGround = false;
-      if (this.vy >= 0) {
+        let bestCollision = null;
         for (const surface of this.ctx.stickSurfaces) {
-          const contact = getRoundedRectTopRestY(playerShape, surface);
-          if (contact === null) continue;
-          const crossedTop = prevY <= contact && this.gfx.y >= contact;
-          if (crossedTop && contact < landingY) {
-            landingSurface = surface;
-            landingY = contact;
-            landedOnGround = false;
+          const collision = getStickCollisionCandidate(currentShape, previousShape, surface);
+          if (!collision) continue;
+          if (!bestCollision || collision.penetration < bestCollision.penetration) {
+            bestCollision = collision;
           }
         }
 
-        const groundContact = this.ctx.GROUND_Y - this.size;
-        if (prevY <= groundContact && this.gfx.y >= groundContact && groundContact < landingY) {
-          landingSurface = null;
-          landingY = groundContact;
-          landedOnGround = true;
+        if (!bestCollision) break;
+
+        if (bestCollision.side === 'top') {
+          this.gfx.y = bestCollision.restPos;
+          const bounceVy = Math.abs(this.vy) * RESTITUTION;
+          this.vy = bounceVy < 0.8 ? 0 : -bounceVy;
+          this.vx *= GROUND_FRICTION;
+          if (this.vy === 0) supportedByGround = true;
+        } else if (bestCollision.side === 'bottom') {
+          this.gfx.y = bestCollision.restPos;
+          const bounceVy = Math.abs(this.vy) * RESTITUTION;
+          this.vy = bounceVy < 0.8 ? 0 : bounceVy;
+          this.vx *= GROUND_FRICTION;
+        } else if (bestCollision.side === 'left') {
+          this.gfx.x = bestCollision.restPos;
+          const bounceVx = Math.abs(this.vx) * WALL_RESTITUTION;
+          this.vx = bounceVx < 0.6 ? 0 : -bounceVx;
+          this.vy *= WALL_FRICTION;
+        } else if (bestCollision.side === 'right') {
+          this.gfx.x = bestCollision.restPos;
+          const bounceVx = Math.abs(this.vx) * WALL_RESTITUTION;
+          this.vx = bounceVx < 0.6 ? 0 : bounceVx;
+          this.vy *= WALL_FRICTION;
         }
       }
 
-      let ceilingSurface = null;
-      let ceilingY = -Infinity;
-      if (this.vy < 0) {
-        for (const surface of this.ctx.stickSurfaces) {
-          const contact = getRoundedRectBottomRestY(playerShape, surface);
-          if (contact === null) continue;
-          const crossedBottom = prevY >= contact && this.gfx.y <= contact;
-          if (crossedBottom) {
-            if (contact > ceilingY) {
-              ceilingSurface = surface;
-              ceilingY = contact;
-            }
-          }
-        }
+      const groundContact = this.ctx.GROUND_Y - this.size;
+      if (this.gfx.y > groundContact) {
+        this.gfx.y = groundContact;
+        this.vy = 0;
+        supportedByGround = true;
       }
 
-      if (ceilingSurface) {
-        this.gfx.y = ceilingY;
-        this.vy = Math.abs(this.vy) * RESTITUTION;
-      } else if (landingSurface || landedOnGround) {
-        this.gfx.y = landingY;
-        if (Math.abs(this.vy) < 0.6) {
-          this.vy = 0;
-        } else {
-          this.vy = -Math.abs(this.vy) * RESTITUTION;
-        }
-        this.onGround = true;
+      if (supportedByGround) {
         this.vx *= GROUND_FRICTION;
-      } else {
-        this.onGround = supportedByWindmill;
       }
 
-      if (supportedByWindmill) {
-        this.onGround = true;
-      }
+      this.onGround = supportedByWindmill || supportedByGround;
 
       if (Math.abs(this.vx) < 0.002) this.vx = 0;
       if (Math.abs(this.vy) < 0.002) this.vy = 0;
