@@ -1,5 +1,18 @@
 (() => {
-  function buildMap({ PIXI, world, MAP_W, GROUND_Y, GRID }) {
+  function createRng(seed) {
+    let state = (seed >>> 0) || 0x6d2b79f5;
+    return {
+      next() {
+        state = (state + 0x6d2b79f5) | 0;
+        let t = Math.imul(state ^ (state >>> 15), 1 | state);
+        t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      },
+    };
+  }
+
+  function buildMap({ PIXI, world, MAP_W, GROUND_Y, GRID, seed = 0x12345678 }) {
+    const rng = createRng(seed);
     const grid = new PIXI.Graphics();
     world.addChild(grid);
 
@@ -43,7 +56,7 @@
     const recentRandomStickXs = [];
 
     function randRange(min, max) {
-      return min + Math.random() * (max - min);
+      return min + rng.next() * (max - min);
     }
 
     function clamp(value, min, max) {
@@ -207,7 +220,7 @@
         bladeThickness,
         hubRadius,
         bladeOffsets,
-        speed: randRange(0.005, 0.01) * (Math.random() < 0.5 ? -1 : 1),
+        speed: randRange(0.005, 0.01) * (rng.next() < 0.5 ? -1 : 1),
         chunk,
       };
       windmills.push(windmill);
@@ -229,7 +242,7 @@
       const width = STICK_LENGTH;
       pathX = addRandomStick(pathX + randRange(-110, 110), Math.round(y), width, STICK_HEIGHT);
 
-      if (Math.random() < 0.14) {
+      if (rng.next() < 0.14) {
         addRandomStick(
           pathX + randRange(-180, 180),
           Math.round(y - randRange(100, 150)),
@@ -238,7 +251,7 @@
         );
       }
 
-      if (Math.random() < 0.12) {
+      if (rng.next() < 0.06) {
         const scale = randRange(0.9, 1.08);
         const wallClearance = getWindmillWallClearance(scale);
         const windmillX = clamp(
@@ -249,16 +262,16 @@
         addWindmill(Math.round(windmillX), Math.round(y - randRange(80, 130)), scale);
       }
 
-      if (Math.random() < 0.18) {
+      if (rng.next() < 0.18) {
         addWallStick('left', y - randRange(20, 120));
       }
-      if (Math.random() < 0.18) {
+      if (rng.next() < 0.18) {
         addWallStick('right', y - randRange(20, 120));
       }
-      if (Math.random() < 0.08) {
+      if (rng.next() < 0.04) {
         addWallWindmill('left', y - randRange(80, 160), randRange(0.85, 1.02));
       }
-      if (Math.random() < 0.08) {
+      if (rng.next() < 0.04) {
         addWallWindmill('right', y - randRange(80, 160), randRange(0.85, 1.02));
       }
     }
@@ -324,6 +337,19 @@
       return getActiveObjects(cameraTop, cameraBottom);
     }
 
+    function generateTo(targetY) {
+      ensureGeneratedAbove(targetY);
+    }
+
+    function getState() {
+      return {
+        seed,
+        nextSpawnY,
+        pathX,
+        recentRandomStickXs: [...recentRandomStickXs],
+      };
+    }
+
     addStick(140, 1840, STICK_LENGTH, STICK_HEIGHT);
     addStick(490, 1500, STICK_LENGTH, STICK_HEIGHT);
     rememberRandomStickX(140);
@@ -336,7 +362,7 @@
     addWallWindmill('right', 760, 1.0);
     ensureGeneratedAbove(GROUND_Y - CHUNK_HEIGHT * 3);
 
-    return { grid, stickSurfaces, windmills, syncToCamera };
+    return { grid, stickSurfaces, windmills, syncToCamera, generateTo, getState };
   }
 
   window.UpUpUpMap = { buildMap };

@@ -26,11 +26,17 @@
     height: 100dvh;
     touch-action: none;
   }
-  #settings-btn {
+  #settings-wrap {
     position: fixed;
     top: 14px;
     right: 14px;
-    z-index: 20;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  #settings-btn {
     border: 2px solid #1a1a1a;
     background: #f7f1e6;
     color: #1a1a1a;
@@ -47,19 +53,91 @@
     transform: translateY(2px);
     box-shadow: 0 2px 0 #1a1a1a;
   }
+  #settings-panel {
+    display: none;
+    width: 220px;
+    border: 2px solid #1a1a1a;
+    background: rgba(247, 241, 230, 0.98);
+    color: #1a1a1a;
+    border-radius: 16px;
+    box-shadow: 0 6px 0 #1a1a1a;
+    padding: 12px;
+    backdrop-filter: blur(6px);
+  }
+  #settings-panel.open {
+    display: block;
+  }
+  .panel-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .panel-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .panel-button {
+    width: 100%;
+    border: 2px solid #1a1a1a;
+    background: #fffdf8;
+    color: #1a1a1a;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #1a1a1a;
+    text-align: left;
+    touch-action: manipulation;
+  }
+  .panel-button:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #1a1a1a;
+  }
+  .panel-button.secondary {
+    background: #f5eee4;
+  }
+  .panel-status {
+    margin-top: 10px;
+    min-height: 34px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #42382f;
+  }
   @media (pointer: coarse) {
-    #settings-btn {
+    #settings-wrap {
       top: max(14px, env(safe-area-inset-top));
       right: max(14px, env(safe-area-inset-right));
+    }
+    #settings-btn {
       font-size: 16px;
       padding: 10px 14px;
+    }
+    #settings-panel {
+      width: min(260px, calc(100vw - 28px));
     }
   }
 </style>
 </head>
 <body>
 <canvas id="game-canvas"></canvas>
-<button id="settings-btn" type="button">GRID ON</button>
+<div id="settings-wrap">
+  <button id="settings-btn" type="button" aria-expanded="false">설정</button>
+  <div id="settings-panel" aria-hidden="true">
+    <div class="panel-title">Game Settings</div>
+    <div class="panel-actions">
+      <button id="grid-toggle-btn" class="panel-button secondary" type="button">격자: 켜짐</button>
+      <button id="save-btn" class="panel-button" type="button">저장</button>
+      <button id="load-btn" class="panel-button" type="button">불러오기</button>
+      <button id="autosave-btn" class="panel-button secondary" type="button">자동 저장: 켜짐</button>
+    </div>
+    <div id="save-status" class="panel-status">저장 데이터가 없습니다.</div>
+  </div>
+</div>
 <script src="./logic.js"></script>
 <script src="./map.js"></script>
 <script src="./game.js"></script>
