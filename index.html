@@ -1,145 +1,105 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>upupup.io</title>
+<title>UPUPUP.io</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #f0ece4;
-    position: fixed;
-    inset: 0;
-    width: 100vw;
-    height: 100dvh;
-    overflow: hidden;
-    font-family: 'Courier New', monospace;
-    touch-action: none;
-    overscroll-behavior: none;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  #game-canvas {
-    display: block;
-    width: 100vw;
-    height: 100dvh;
-    touch-action: none;
-  }
-  #settings-wrap {
-    position: fixed;
-    top: 14px;
-    right: 14px;
-    z-index: 30;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 10px;
-  }
-  #settings-btn {
-    border: 2px solid #1a1a1a;
-    background: #f7f1e6;
-    color: #1a1a1a;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    font-weight: 700;
-    padding: 8px 12px;
-    border-radius: 999px;
-    cursor: pointer;
-    box-shadow: 0 4px 0 #1a1a1a;
-    touch-action: manipulation;
-  }
-  #settings-btn:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 #1a1a1a;
-  }
-  #settings-panel {
-    display: none;
-    width: 220px;
-    border: 2px solid #1a1a1a;
-    background: rgba(247, 241, 230, 0.98);
-    color: #1a1a1a;
-    border-radius: 16px;
-    box-shadow: 0 6px 0 #1a1a1a;
-    padding: 12px;
-    backdrop-filter: blur(6px);
-  }
-  #settings-panel.open {
-    display: block;
-  }
-  .panel-title {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-  .panel-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .panel-button {
-    width: 100%;
-    border: 2px solid #1a1a1a;
-    background: #fffdf8;
-    color: #1a1a1a;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    font-weight: 700;
-    padding: 10px 12px;
-    border-radius: 12px;
-    cursor: pointer;
-    box-shadow: 0 3px 0 #1a1a1a;
-    text-align: left;
-    touch-action: manipulation;
-  }
-  .panel-button:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 #1a1a1a;
-  }
-  .panel-button.secondary {
-    background: #f5eee4;
-  }
-  .panel-status {
-    margin-top: 10px;
-    min-height: 34px;
-    font-size: 12px;
-    line-height: 1.35;
-    color: #42382f;
-  }
-  @media (pointer: coarse) {
-    #settings-wrap {
-      top: max(14px, env(safe-area-inset-top));
-      right: max(14px, env(safe-area-inset-right));
-    }
-    #settings-btn {
-      font-size: 16px;
-      padding: 10px 14px;
-    }
-    #settings-panel {
-      width: min(260px, calc(100vw - 28px));
-    }
-  }
-</style>
+<link rel="stylesheet" href="./css/styles.css">
 </head>
 <body>
 <canvas id="game-canvas"></canvas>
-<div id="settings-wrap">
-  <button id="settings-btn" type="button" aria-expanded="false">설정</button>
-  <div id="settings-panel" aria-hidden="true">
-    <div class="panel-title">Game Settings</div>
-    <div class="panel-actions">
-      <button id="grid-toggle-btn" class="panel-button secondary" type="button">격자: 켜짐</button>
-      <button id="save-btn" class="panel-button" type="button">저장</button>
-      <button id="load-btn" class="panel-button" type="button">불러오기</button>
-      <button id="autosave-btn" class="panel-button secondary" type="button">자동 저장: 켜짐</button>
+<button id="game-exit-btn" class="game-exit-btn" type="button" hidden aria-label="게임 끝내기">
+  <span class="game-exit-icon" aria-hidden="true">←</span>
+  <span class="game-exit-label">끝내기</span>
+</button>
+<div id="menu-overlay" role="dialog" aria-label="Main menu">
+  <div class="menu-tablist" role="tablist" aria-label="Main menu tabs">
+    <button id="menu-tab-shop" class="menu-tab-button" type="button" role="tab" aria-selected="false" aria-controls="menu-panel-shop" data-menu-tab="shop">
+      <span class="menu-tab-kicker">SHOP</span>
+      <span class="menu-tab-label">상점</span>
+    </button>
+    <button id="menu-tab-game" class="menu-tab-button" type="button" role="tab" aria-selected="true" aria-controls="menu-panel-game" data-menu-tab="game">
+      <span class="menu-tab-kicker">GAME</span>
+      <span class="menu-tab-label">메인</span>
+    </button>
+    <button id="menu-tab-settings" class="menu-tab-button" type="button" role="tab" aria-selected="false" aria-controls="menu-panel-settings" data-menu-tab="settings">
+      <span class="menu-tab-kicker">SETTINGS</span>
+      <span class="menu-tab-label">설정</span>
+    </button>
+  </div>
+
+  <div class="menu-shell">
+    <div class="menu-panels">
+      <section id="menu-panel-shop" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-shop" data-menu-panel="shop" hidden>
+        <div class="menu-panel-inner menu-panel-empty">
+          <span class="menu-panel-kicker">SHOP</span>
+          <h2 class="menu-panel-title">상점</h2>
+          <p class="menu-panel-empty-text">아직 상점에는 아무것도 없습니다.</p>
+        </div>
+      </section>
+
+      <section id="menu-panel-game" class="menu-panel is-active" role="tabpanel" aria-labelledby="menu-tab-game" data-menu-panel="game">
+        <div class="menu-panel-inner menu-panel-main">
+          <div class="menu-title" aria-label="UPUPUP.io">
+            <span class="menu-title-main">UPUPUP</span><span class="menu-title-io">.io</span>
+          </div>
+          <p id="menu-credit-balance" class="menu-credit-balance" aria-live="polite">보유 크레딧: 0</p>
+          <div class="menu-actions">
+            <button id="menu-play-btn" class="menu-tile" type="button" aria-label="새 게임 시작" data-variant="play">
+              <div class="menu-tile-head">
+                <span class="menu-tile-kicker">START</span>
+                <span class="menu-tile-arrow" aria-hidden="true"></span>
+              </div>
+              <span class="menu-tile-title">새 게임</span>
+              <span class="menu-tile-desc">처음부터 다시 시작합니다. 기록이 없다면 이 버튼으로 플레이를 시작하세요.</span>
+            </button>
+            <button id="menu-continue-btn" class="menu-tile" type="button" aria-label="저장된 게임 이어하기" data-variant="continue">
+              <div class="menu-tile-head">
+                <span class="menu-tile-kicker">CONTINUE</span>
+                <span class="menu-tile-arrow" aria-hidden="true"></span>
+              </div>
+              <span class="menu-tile-title">이어하기</span>
+              <span class="menu-tile-desc">마지막 저장 지점에서 계속합니다.</span>
+            </button>
+          </div>
+          <p id="menu-continue-note" class="menu-note">저장된 진행이 있으면 이어하기 버튼이 활성화됩니다.</p>
+        </div>
+      </section>
+
+      <section id="menu-panel-settings" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-settings" data-menu-panel="settings" hidden>
+        <div class="menu-panel-inner menu-panel-settings">
+          <span class="menu-panel-kicker">SETTINGS</span>
+          <h2 class="menu-panel-title">설정</h2>
+          <div id="settings-panel" class="menu-settings-grid">
+            <button id="grid-toggle-btn" class="panel-button secondary" type="button">
+              <span class="panel-button-title">격자</span>
+              <span class="panel-button-desc">맵의 격자선을 켜고 끕니다. 화면 구성을 확인하기 좋습니다.</span>
+            </button>
+            <button id="save-btn" class="panel-button" type="button">
+              <span class="panel-button-title">수동 저장</span>
+              <span class="panel-button-desc">현재 진행 상태를 저장합니다. 게임을 다시 시작해도 사용할 수 있습니다.</span>
+            </button>
+            <button id="load-btn" class="panel-button" type="button">
+              <span class="panel-button-title">불러오기</span>
+              <span class="panel-button-desc">마지막 저장을 불러옵니다. 저장된 파일이 있을 때만 사용할 수 있습니다.</span>
+            </button>
+            <button id="autosave-btn" class="panel-button secondary" type="button">
+              <span class="panel-button-title">자동 저장</span>
+              <span class="panel-button-desc">진행 상황을 주기적으로 저장합니다. 끄면 수동 저장만 가능합니다.</span>
+            </button>
+          </div>
+          <p id="save-status" class="menu-note" aria-live="polite"></p>
+        </div>
+      </section>
     </div>
-    <div id="save-status" class="panel-status">저장 데이터가 없습니다.</div>
   </div>
 </div>
-<script src="./logic.js"></script>
-<script src="./map.js"></script>
-<script src="./game.js"></script>
+<script src="./js/logic.js"></script>
+<script src="./js/map.js"></script>
+<script src="./js/shared.js"></script>
+<script src="./js/ui.js"></script>
+<script src="./js/runtime.js"></script>
+<script src="./js/game.js"></script>
 </body>
 </html>
