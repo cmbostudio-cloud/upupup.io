@@ -17,11 +17,16 @@
     MAP_W,
     GROUND_Y,
     GRID,
+    mode = 'infinite',
+    stage = 1,
     seed = 0x12345678,
     collectedCreditIds = [],
+    collectedPortalIds = [],
   }) {
     const rng = createRng(seed);
     const collectedCreditIdSet = new Set(collectedCreditIds);
+    const collectedPortalIdSet = new Set(collectedPortalIds);
+    const isStageOne = mode === 'stage' && stage === 1;
     const grid = new PIXI.Graphics();
     world.addChild(grid);
 
@@ -51,6 +56,7 @@
     const movingSticks = [];
     const windmills = [];
     const credits = [];
+    const portals = [];
     const chunks = new Map();
     const recentSpawns = [];
     const recentStickSpawns = [];
@@ -74,6 +80,8 @@
     const STICK_SPAWN_PAD_Y = 10;
     const MOVING_STICK_Y_GAP = Math.round(GRID * 1.8);
     const WINDMILL_MOVING_STICK_Y_GAP = Math.round(GRID * 3.2);
+    const PORTAL_SIZE = 136;
+    const STAGE_ONE_STAR_SIZE = 28;
     const CREDIT_SIZE = 20;
     const CREDIT_Y_STEP = GRID * 5;
     const CREDIT_Y_OFFSET_MIN = 42;
@@ -157,6 +165,43 @@
         0,
       ]);
       credit.endFill();
+    }
+
+    function drawPortalShape(portal, width, height) {
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const radius = Math.min(width, height) / 2;
+      const starLayer = new PIXI.Container();
+      starLayer.x = centerX;
+      starLayer.y = centerY;
+
+      function buildStarPoints(outerRadius, innerRadius, points = 5, rotation = -Math.PI / 2) {
+        const polygon = [];
+        const step = Math.PI / points;
+        for (let i = 0; i < points * 2; i++) {
+          const angle = rotation + step * i;
+          const currentRadius = i % 2 === 0 ? outerRadius : innerRadius;
+          polygon.push(Math.cos(angle) * currentRadius, Math.sin(angle) * currentRadius);
+        }
+        return polygon;
+      }
+
+      const starOuter = radius * 0.92;
+      const starInner = radius * 0.44;
+      const starFill = 0xd4af37;
+      const starBorder = 0x5d4300;
+      const borderWidth = Math.max(2, Math.round(radius * 0.2));
+
+      const star = new PIXI.Graphics();
+      star.lineStyle(borderWidth, starBorder, 1);
+      star.beginFill(starFill, 1);
+      star.drawPolygon(buildStarPoints(starOuter, starInner));
+      star.endFill();
+      starLayer.addChild(star);
+
+      portal.addChild(starLayer);
+      portal.ringLayer = starLayer;
+      portal.radius = radius;
     }
 
     function getPreferredObstacleSide() {
@@ -702,6 +747,52 @@
       return item;
     }
 
+    function addPortal(x, y, width = PORTAL_SIZE, height = PORTAL_SIZE) {
+      const chunk = ensureChunk(getChunkIndex(y));
+      const portal = new PIXI.Container();
+      drawPortalShape(portal, width, height);
+      const centerX = Math.round(x + width / 2);
+      const centerY = Math.round(y + height / 2);
+      portal.x = Math.round(x);
+      portal.y = Math.round(y);
+      chunk.container.addChild(portal);
+
+      const item = {
+        id: portals.length,
+        x: Math.round(x),
+        y: Math.round(y),
+        width,
+        height,
+        centerX,
+        centerY,
+        radius: Math.max(width, height) / 2,
+        collected: false,
+        chunk,
+        gfx: portal,
+        phase: rng.next() * Math.PI * 2,
+        pulseSpeed: 1.8 + rng.next() * 0.7,
+        pulseAmplitude: 0.055 + rng.next() * 0.02,
+      };
+
+      portals.push(item);
+      if (collectedPortalIdSet.has(item.id)) {
+        item.collected = true;
+        portal.visible = false;
+        portal.renderable = false;
+      }
+      if (!chunk.portals) {
+        chunk.portals = [];
+      }
+      chunk.portals.push(item);
+      rememberSpawn({
+        kind: 'portal',
+        x: item.centerX,
+        y: item.centerY,
+        radius: item.radius,
+      });
+      return item;
+    }
+
     function spawnRandomCredit(y, anchorX, width = STICK_LENGTH) {
       const x = clamp(
         anchorX + randRange(-width * 0.12, width * 0.12),
@@ -769,7 +860,30 @@
       }
     }
 
+    function createStageOneLayout() {
+      const lowerToHalfHeight = (y) => Math.round(GROUND_Y - (GROUND_Y - y) * 0.5);
+      const stickY = lowerToHalfHeight(GROUND_Y - 580);
+      const stickX = 128;
+      const stickWidth = 644;
+      addStick(stickX, stickY, stickWidth, STICK_HEIGHT);
+      const starSize = STAGE_ONE_STAR_SIZE;
+      const halfStar = starSize / 2;
+      const centerStarX = Math.round(MAP_W / 2 - halfStar);
+      const leftStarX = Math.round(MAP_W / 2 - 150 - halfStar);
+      const rightStarX = Math.round(MAP_W / 2 + 150 - halfStar);
+      const lowerStarY = Math.round(stickY - 84);
+      const upperStarY = Math.round(stickY - 186);
+      addPortal(leftStarX, lowerStarY, starSize, starSize);
+      addPortal(centerStarX, upperStarY, starSize, starSize);
+      addPortal(rightStarX, lowerStarY, starSize, starSize);
+    }
+
     function seedInitialObjects() {
+      if (isStageOne) {
+        createStageOneLayout();
+        return;
+      }
+
       let y = GROUND_Y - randRange(220, 280);
       for (let i = 0; i < 4; i++) {
         addSpawnStep(Math.round(y));
@@ -778,6 +892,7 @@
     }
 
     function ensureGeneratedAbove(targetY) {
+      if (isStageOne) return;
       while (nextSpawnY > targetY) {
         addSpawnStep(nextSpawnY);
         nextSpawnY -= randRange(220, 320);
@@ -845,6 +960,7 @@
       stickSurfaces: [],
       windmills: [],
       credits: [],
+      portals: [],
     };
 
     function updateChunkVisibility(minIndex, maxIndex) {
@@ -884,6 +1000,7 @@
       const activeStickSurfaces = [];
       const activeWindmills = [];
       const activeCredits = [];
+      const activePortals = [];
 
       for (let index = minIndex; index <= maxIndex; index++) {
         const chunk = chunks.get(index);
@@ -893,6 +1010,9 @@
         if (chunk.credits) {
           activeCredits.push(...chunk.credits);
         }
+        if (chunk.portals) {
+          activePortals.push(...chunk.portals);
+        }
       }
 
       lastActiveRangeKey = rangeKey;
@@ -900,6 +1020,7 @@
         stickSurfaces: activeStickSurfaces,
         windmills: activeWindmills,
         credits: activeCredits,
+        portals: activePortals,
       };
       return lastActiveObjects;
     }
@@ -922,17 +1043,20 @@
         nextSpawnY,
         pathX,
         collectedCreditIds: credits.filter((credit) => credit.collected).map((credit) => credit.id),
+        collectedPortalIds: portals.filter((portal) => portal.collected).map((portal) => portal.id),
       };
     }
 
     seedInitialObjects();
-    if (movingSticks.length === 0) {
-      spawnRandomMovingStick(GROUND_Y - randRange(300, 440), Math.round(STICK_LENGTH * randRange(0.62, 0.78)), STICK_HEIGHT);
+    if (!isStageOne) {
+      if (movingSticks.length === 0) {
+        spawnRandomMovingStick(GROUND_Y - randRange(300, 440), Math.round(STICK_LENGTH * randRange(0.62, 0.78)), STICK_HEIGHT);
+      }
+      if (windmills.length === 0) {
+        spawnRandomWindmill(GROUND_Y - randRange(420, 560), randRange(0.94, 1.04));
+      }
+      ensureGeneratedAbove(GROUND_Y - CHUNK_HEIGHT * 3);
     }
-    if (windmills.length === 0) {
-      spawnRandomWindmill(GROUND_Y - randRange(420, 560), randRange(0.94, 1.04));
-    }
-    ensureGeneratedAbove(GROUND_Y - CHUNK_HEIGHT * 3);
 
     return {
       grid,
@@ -940,6 +1064,7 @@
       movingSticks,
       windmills,
       credits,
+      portals,
       syncToCamera,
       generateTo,
       getState,

@@ -9,22 +9,22 @@
 </head>
 <body>
 <canvas id="game-canvas"></canvas>
-<button id="game-exit-btn" class="game-exit-btn" type="button" hidden aria-label="게임 끝내기">
-  <span class="game-exit-icon" aria-hidden="true">←</span>
-  <span class="game-exit-label">끝내기</span>
+<button id="game-exit-btn" class="game-exit-btn" type="button" hidden aria-label="게임 종료">
+  <span class="game-exit-icon" aria-hidden="true">×</span>
+  <span class="game-exit-label">종료</span>
 </button>
-<div id="menu-overlay" role="dialog" aria-label="Main menu">
-  <div class="menu-tablist" role="tablist" aria-label="Main menu tabs">
+<div id="menu-overlay" role="dialog" aria-label="메인 메뉴">
+  <div class="menu-tablist" role="tablist" aria-label="메인 메뉴 탭">
     <button id="menu-tab-shop" class="menu-tab-button" type="button" role="tab" aria-selected="false" aria-controls="menu-panel-shop" data-menu-tab="shop">
-      <span class="menu-tab-kicker">SHOP</span>
+      <span class="menu-tab-kicker">상점</span>
       <span class="menu-tab-label">상점</span>
     </button>
     <button id="menu-tab-game" class="menu-tab-button" type="button" role="tab" aria-selected="true" aria-controls="menu-panel-game" data-menu-tab="game">
-      <span class="menu-tab-kicker">GAME</span>
-      <span class="menu-tab-label">메인</span>
+      <span class="menu-tab-kicker">게임</span>
+      <span class="menu-tab-label">게임</span>
     </button>
     <button id="menu-tab-settings" class="menu-tab-button" type="button" role="tab" aria-selected="false" aria-controls="menu-panel-settings" data-menu-tab="settings">
-      <span class="menu-tab-kicker">SETTINGS</span>
+      <span class="menu-tab-kicker">설정</span>
       <span class="menu-tab-label">설정</span>
     </button>
   </div>
@@ -33,7 +33,7 @@
     <div class="menu-panels">
       <section id="menu-panel-shop" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-shop" data-menu-panel="shop" hidden>
         <div class="menu-panel-inner menu-panel-empty">
-          <span class="menu-panel-kicker">SHOP</span>
+          <span class="menu-panel-kicker">상점</span>
           <h2 class="menu-panel-title">상점</h2>
           <p class="menu-panel-empty-text">아직 상점에는 아무것도 없습니다.</p>
         </div>
@@ -44,38 +44,55 @@
           <div class="menu-title" aria-label="UPUPUP.io">
             <span class="menu-title-main">UPUPUP</span><span class="menu-title-io">.io</span>
           </div>
-          <p id="menu-credit-balance" class="menu-credit-balance" aria-live="polite">보유 크레딧: 0</p>
+          <p id="menu-credit-balance" class="menu-credit-balance" aria-live="polite">보유 크레딧 0</p>
           <div class="menu-actions">
-            <button id="menu-play-btn" class="menu-tile" type="button" aria-label="새 게임 시작" data-variant="play">
+            <button id="menu-play-btn" class="menu-tile" type="button" aria-label="일반 모드 선택" data-variant="play">
               <div class="menu-tile-head">
-                <span class="menu-tile-kicker">START</span>
+                <span class="menu-tile-kicker">일반 모드</span>
                 <span class="menu-tile-arrow" aria-hidden="true"></span>
               </div>
-              <span class="menu-tile-title">새 게임</span>
-              <span class="menu-tile-desc">처음부터 다시 시작합니다. 기록이 없다면 이 버튼으로 플레이를 시작하세요.</span>
+              <span class="menu-tile-title">일반 모드</span>
+              <span class="menu-tile-desc">스테이지를 선택해 시작합니다. 기록이 없다면 새 진행을 시작하세요.</span>
             </button>
-            <button id="menu-continue-btn" class="menu-tile" type="button" aria-label="저장된 게임 이어하기" data-variant="continue">
+            <button id="menu-continue-btn" class="menu-tile" type="button" aria-label="무한 모드 선택" data-variant="continue">
               <div class="menu-tile-head">
-                <span class="menu-tile-kicker">CONTINUE</span>
+                <span class="menu-tile-kicker">무한 모드</span>
                 <span class="menu-tile-arrow" aria-hidden="true"></span>
               </div>
-              <span class="menu-tile-title">이어하기</span>
-              <span class="menu-tile-desc">마지막 저장 지점에서 계속합니다.</span>
+              <span class="menu-tile-title">무한 모드</span>
+              <span class="menu-tile-desc">새 게임을 만들거나 마지막 저장 지점에서 이어서 플레이합니다.</span>
             </button>
           </div>
-          <p id="menu-continue-note" class="menu-note">저장된 진행이 있으면 이어하기 버튼이 활성화됩니다.</p>
+          <p id="menu-continue-note" class="menu-note">저장된 진행이 있을 때만 이어하기를 사용할 수 있습니다.</p>
         </div>
       </section>
 
       <section id="menu-panel-settings" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-settings" data-menu-panel="settings" hidden>
         <div class="menu-panel-inner menu-panel-settings">
-          <span class="menu-panel-kicker">SETTINGS</span>
+          <span class="menu-panel-kicker">설정</span>
           <h2 class="menu-panel-title">설정</h2>
           <div id="settings-panel" class="menu-settings-grid">
             <button id="grid-toggle-btn" class="panel-button secondary" type="button">
               <span class="panel-button-title">격자</span>
               <span class="panel-button-desc">맵의 격자선을 켜고 끕니다. 화면 구성을 확인하기 좋습니다.</span>
             </button>
+          </div>
+          <div class="menu-audio-control" role="group" aria-label="소리 크기">
+            <span class="panel-button-title">소리</span>
+            <div class="menu-audio-slider-row">
+              <input
+                id="audio-volume-slider"
+                class="menu-audio-slider"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="80"
+                aria-label="소리 크기"
+              >
+              <span id="audio-volume-value" class="menu-audio-value">80%</span>
+            </div>
+            <span class="panel-button-desc">게임 전체 소리 크기를 조절합니다.</span>
           </div>
           <p id="save-status" class="menu-note" aria-live="polite"></p>
         </div>
@@ -86,6 +103,7 @@
 <script src="./js/logic.js"></script>
 <script src="./js/map.js"></script>
 <script src="./js/shared.js"></script>
+<script src="./js/audio.js"></script>
 <script src="./js/ui.js"></script>
 <script src="./js/runtime.js"></script>
 <script src="./js/game.js"></script>

@@ -127,27 +127,9 @@
     return Number.isFinite(value) ? value : fallback;
   }
 
-  function readStartMode() {
-    try {
-      const mode = sessionStorage.getItem(START_MODE_KEY);
-      return mode === 'play' || mode === 'continue' ? mode : 'menu';
-    } catch {
-      return 'menu';
-    }
-  }
-
   function writeStartMode(mode) {
     try {
       sessionStorage.setItem(START_MODE_KEY, mode);
-    } catch {
-      return false;
-    }
-    return true;
-  }
-
-  function clearStartMode() {
-    try {
-      sessionStorage.removeItem(START_MODE_KEY);
     } catch {
       return false;
     }
@@ -187,9 +169,7 @@
     writePrefs,
     formatTime,
     numberOr,
-    readStartMode,
     writeStartMode,
-    clearStartMode,
     storageReadSave,
     storageWriteSave,
   };

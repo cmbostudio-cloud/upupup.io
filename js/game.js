@@ -1,68 +1,82 @@
 (() => {
   const {
     storageReadSave,
-    readStartMode,
-    clearStartMode,
   } = window.UpUpUpShared;
 
   const shell = window.UpUpUpUI.createUIController();
   const initialSave = storageReadSave();
-  const startMode = readStartMode();
   const audio = window.UpUpUpAudio?.createAudioManager?.(shell.getPreferences().audioVolume) ?? null;
   const canvas = document.getElementById('game-canvas');
 
   let gameInstance = null;
 
-  function beginGame(mode, save) {
+  function beginGame({ mode = 'infinite', stage = 1, save = null } = {}) {
     if (gameInstance) return;
-    clearStartMode();
+
     shell.setMenuVisible(false);
-    shell.setChromeVisible(false);
-    shell.setPanelOpen(false);
-    audio?.unlock();
+    audio?.unlock?.();
+
     gameInstance = window.UpUpUpRuntime.startGame({
       canvas,
       shell,
       initialSave: save,
       audio,
+      mode,
+      stage,
     });
   }
 
-  function startFreshGame() {
-    const hasSave = Boolean(initialSave);
-    if (hasSave) {
-      const shouldStartFresh = window.confirm('이미 저장된 진행이 있습니다. 처음부터 시작할까요?');
-      if (!shouldStartFresh) return;
-    }
-    beginGame('play', null);
+  function startInfiniteMode() {
+    shell.setStatus('무한 모드를 선택하세요.');
+    shell.setGameView?.('infinite');
   }
 
-  function startContinueGame() {
-    if (!initialSave) return;
-    beginGame('continue', initialSave);
+  function startStageMode() {
+    shell.setStatus('스테이지를 선택하세요.');
+    shell.setGameView?.('stages');
+  }
+
+  function startInfiniteNew() {
+    beginGame({
+      mode: 'infinite',
+      stage: 1,
+      save: null,
+    });
+  }
+
+  function continueInfinite() {
+    const latestSave = storageReadSave();
+    const saved = latestSave && latestSave.mode === 'infinite'
+      ? latestSave
+      : null;
+    beginGame({
+      mode: 'infinite',
+      stage: 1,
+      save: saved,
+    });
+  }
+
+  function startStage(stageNumber) {
+    const stage = Math.max(1, Math.floor(Number(stageNumber) || 1));
+    beginGame({
+      mode: 'stage',
+      stage,
+      save: null,
+    });
   }
 
   shell.updateMenuState(initialSave);
 
   shell.setActions({
-    onStartNewGame: startFreshGame,
-    onContinueGame: startContinueGame,
+    onStartStageMode: startStageMode,
+    onStartInfiniteMode: startInfiniteMode,
+    onStartInfiniteNew: startInfiniteNew,
+    onContinueInfinite: continueInfinite,
+    onStartStage: startStage,
     onSetAudioVolume: (volume) => {
       audio?.setVolume(volume);
     },
   });
 
-  if (startMode === 'play') {
-    beginGame('play', null);
-    return;
-  }
-
-  if (startMode === 'continue') {
-    beginGame('continue', initialSave);
-    return;
-  }
-
   shell.setMenuVisible(true);
-  shell.setChromeVisible(true);
-  shell.setPanelOpen(false);
 })();

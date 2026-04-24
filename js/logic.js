@@ -438,17 +438,32 @@
       const GROUND_FRICTION = 0.84;
       const WALL_RESTITUTION = 0.58;
       const WALL_FRICTION = 0.88;
+      let supportedByWindmill = false;
+      let supportedStickSurface = null;
+      let impactEvent = null;
+      const queueImpact = (strength, kind = 'wall', source = null) => {
+        const nextStrength = Math.max(0, strength);
+        if (!impactEvent || nextStrength > impactEvent.strength) {
+          impactEvent = { strength: nextStrength, kind, source };
+          return;
+        }
+        if (nextStrength === impactEvent.strength && kind === 'stick' && impactEvent.kind !== 'stick') {
+          impactEvent = { strength: nextStrength, kind, source };
+        }
+      };
 
       const clampToWalls = () => {
         if (this.gfx.x < 0) {
           this.gfx.x = 0;
           this.vx = Math.abs(this.vx) * WALL_RESTITUTION;
           this.vy *= WALL_FRICTION;
+          queueImpact(Math.max(0.28, Math.abs(prevVx) * 0.22), 'wall', 'left-wall');
         }
         if (this.gfx.x + this.size > this.ctx.MAP_W) {
           this.gfx.x = this.ctx.MAP_W - this.size;
           this.vx = -Math.abs(this.vx) * WALL_RESTITUTION;
           this.vy *= WALL_FRICTION;
+          queueImpact(Math.max(0.28, Math.abs(prevVx) * 0.22), 'wall', 'right-wall');
         }
       };
 
@@ -459,13 +474,6 @@
         width: this.size,
         height: this.size,
         radius: this.ctx.PLAYER_RADIUS,
-      };
-
-      let supportedByWindmill = false;
-      let supportedStickSurface = null;
-      let impactStrength = 0;
-      const queueImpact = (strength) => {
-        impactStrength = Math.max(impactStrength, strength);
       };
       const windmillHit = getWindmillCollision(playerShape, this.ctx.windmills || []);
       if (windmillHit) {
@@ -488,13 +496,13 @@
           this.gfx.y += windmillHit.bladeVelY;
           supportedByWindmill = true;
           if (!wasTouchingWindmill && Math.abs(relativeVy) > 0.85) {
-            queueImpact(Math.max(0.45, Math.abs(relativeVy) * 0.28));
+            queueImpact(Math.max(0.45, Math.abs(relativeVy) * 0.28), 'wall', windmillHit.windmill);
           }
         } else if (normalSpeed < -0.55) {
           this.vx -= windmillHit.normalX * normalSpeed;
           this.vy -= windmillHit.normalY * normalSpeed;
           if (!wasTouchingWindmill) {
-            queueImpact(Math.max(0.5, Math.abs(normalSpeed) * 0.22));
+            queueImpact(Math.max(0.5, Math.abs(normalSpeed) * 0.22), 'wall', windmillHit.windmill);
           }
         }
         playerShape.x = this.gfx.x;
@@ -545,7 +553,11 @@
 
         if (bestCollision.side === 'top') {
           this.gfx.y = bestCollision.restPos;
-          queueImpact(Math.max(0.45, Math.abs(prevVy) * 0.28));
+          queueImpact(
+            Math.max(0.45, Math.abs(prevVy) * 0.28),
+            bestCollision.surface ? 'stick' : 'wall',
+            bestCollision.surface ?? 'ground'
+          );
           const bounceVy = Math.abs(this.vy) * RESTITUTION;
           this.vy = bounceVy < 0.8 ? 0 : -bounceVy;
           this.vx *= GROUND_FRICTION;
@@ -557,19 +569,23 @@
           }
         } else if (bestCollision.side === 'bottom') {
           this.gfx.y = bestCollision.restPos;
-          queueImpact(Math.max(0.35, Math.abs(prevVy) * 0.2));
+          queueImpact(
+            Math.max(0.35, Math.abs(prevVy) * 0.2),
+            bestCollision.surface ? 'stick' : 'wall',
+            bestCollision.surface ?? 'ceiling'
+          );
           const bounceVy = Math.abs(this.vy) * RESTITUTION;
           this.vy = bounceVy < 0.8 ? 0 : bounceVy;
           this.vx *= GROUND_FRICTION;
         } else if (bestCollision.side === 'left') {
           this.gfx.x = bestCollision.restPos;
-          queueImpact(Math.max(0.3, Math.abs(this.vx) * 0.22));
+          queueImpact(Math.max(0.3, Math.abs(this.vx) * 0.22), 'wall', 'left-wall');
           const bounceVx = Math.abs(this.vx) * WALL_RESTITUTION;
           this.vx = bounceVx < 0.6 ? 0 : -bounceVx;
           this.vy *= WALL_FRICTION;
         } else if (bestCollision.side === 'right') {
           this.gfx.x = bestCollision.restPos;
-          queueImpact(Math.max(0.3, Math.abs(this.vx) * 0.22));
+          queueImpact(Math.max(0.3, Math.abs(this.vx) * 0.22), 'wall', 'right-wall');
           const bounceVx = Math.abs(this.vx) * WALL_RESTITUTION;
           this.vx = bounceVx < 0.6 ? 0 : bounceVx;
           this.vy *= WALL_FRICTION;
@@ -579,7 +595,7 @@
       const groundContact = this.ctx.GROUND_Y - this.size;
       if (this.gfx.y > groundContact) {
         this.gfx.y = groundContact;
-        queueImpact(Math.max(0.45, Math.abs(prevVy) * 0.26));
+        queueImpact(Math.max(0.45, Math.abs(prevVy) * 0.26), 'wall', 'ground');
         const bounceVy = Math.abs(this.vy) * RESTITUTION;
         this.vy = bounceVy < 0.8 ? 0 : -bounceVy;
         if (this.vy === 0) supportedByGround = true;
@@ -603,11 +619,15 @@
       }
 
       if (
-        impactStrength > 0 &&
+        impactEvent &&
         typeof this.ctx.onImpact === 'function' &&
+        this._lastImpactSource !== impactEvent.source &&
         (!wasTouchingWindmill || !touchingWindmill || Math.abs(prevVy) > 1.4 || Math.abs(prevVx) > 1.4 || !wasOnGround)
       ) {
-        this.ctx.onImpact(impactStrength);
+        this.ctx.onImpact(impactEvent);
+        this._lastImpactSource = impactEvent.source;
+      } else if (!impactEvent) {
+        this._lastImpactSource = null;
       }
 
       this.onGround = supportedByWindmill || supportedByGround || supportedStickSurface != null;
