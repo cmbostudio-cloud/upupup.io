@@ -14,7 +14,7 @@
     writeStartMode,
   } = window.UpUpUpShared;
 
-  function startGame({ canvas, shell, initialSave }) {
+  function startGame({ canvas, shell, initialSave, audio }) {
     let { width: CANVAS_W, height: CANVAS_H } = getViewportSize();
     const IS_TOUCH_DEVICE =
       window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -34,10 +34,6 @@
     let isLoadingFromSave = false;
     const gameExitBtn = document.getElementById('game-exit-btn');
 
-    if (initialSave?.gridVisible != null) {
-      gridVisible = Boolean(initialSave.gridVisible);
-    }
-
     const app = new PIXI.Application({
       view: canvas,
       width: CANVAS_W,
@@ -52,6 +48,8 @@
     app.stage.addChild(world);
     const uiLayer = new PIXI.Container();
     app.stage.addChild(uiLayer);
+    const audioManager =
+      audio ?? (window.UpUpUpAudio?.createAudioManager?.(shell.getPreferences().audioVolume) ?? null);
 
     const gameSeed = initialSave?.seed ?? createSeed();
     const initialCollectedCreditIds = initialSave?.map?.collectedCreditIds ?? [];
@@ -225,7 +223,6 @@
         version: SAVE_VERSION,
         savedAt: Date.now(),
         seed: map.getState().seed,
-        gridVisible,
         player: {
           x: player.gfx.x,
           y: player.gfx.y,
@@ -282,6 +279,7 @@
         windmills: [],
         credits: [],
         onCreditCollected: null,
+        onImpact: null,
         MAP_W,
         GROUND_Y,
         MAX_PULL,
@@ -297,9 +295,14 @@
     player.onGround = Boolean(initialSaveForGame?.player?.onGround);
     player.ctx.onCreditCollected = (credit) => {
       if (!map.collectCredit(credit)) return;
-      creditBalance += getCreditValue(computeScore());
+      const creditValue = getCreditValue(computeScore());
+      creditBalance += creditValue;
       updateMenuCreditBalance();
       updateCreditText();
+      audioManager?.playCollect(creditValue);
+    };
+    player.ctx.onImpact = (strength) => {
+      audioManager?.playImpact(strength);
     };
 
     world.addChild(player.ctx.dotLayer);
@@ -355,6 +358,7 @@
     updateScore(true);
     updateCreditText();
     updateMenuCreditBalance();
+    audioManager?.playStartSwoosh();
 
     if (initialSaveForGame) {
       setStatus(`저장 데이터를 불러왔습니다 · ${formatTime(initialSaveForGame.savedAt ?? Date.now())}`);
@@ -363,22 +367,17 @@
     }
 
     shell.setActions({
+      onSetGridVisible: (visible) => {
+        setGridVisible(visible);
+        setStatus(visible ? '격자선을 켰습니다.' : '격자선을 껐습니다.');
+      },
       onToggleGrid: () => {
-        setGridVisible(!gridVisible);
-        setStatus(gridVisible ? '격자선을 켰습니다.' : '격자선을 껐습니다.');
-      },
-      onSave: () => {
-        saveGame('수동 저장');
-      },
-      onLoad: () => {
-        loadCurrentSave();
+        const nextVisible = !gridVisible;
+        setGridVisible(nextVisible);
+        setStatus(nextVisible ? '격자선을 켰습니다.' : '격자선을 껐습니다.');
       },
       onQuit: () => {
         quitToMenu();
-      },
-      onToggleAutosave: () => {
-        setAutosaveEnabled(!autoSaveEnabled);
-        setStatus(autoSaveEnabled ? '자동 저장을 켰습니다.' : '자동 저장을 껐습니다.');
       },
     });
 

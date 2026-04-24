@@ -306,6 +306,7 @@
       this.pullX = 0;
       this.pullY = 0;
       this.onGround = false;
+      this._touchingWindmill = false;
 
       this.gfx = new PIXI.Graphics();
       this.gfx.x = x;
@@ -425,6 +426,11 @@
       if (this.dragging) return;
       const prevX = this.gfx.x;
       const prevY = this.gfx.y;
+      const prevVx = this.vx;
+      const prevVy = this.vy;
+      const wasOnGround = this.onGround;
+      const wasTouchingWindmill = this._touchingWindmill;
+      let touchingWindmill = false;
       this.vy += this.gravity;
       this.gfx.x += this.vx;
       this.gfx.y += this.vy;
@@ -457,8 +463,13 @@
 
       let supportedByWindmill = false;
       let supportedStickSurface = null;
+      let impactStrength = 0;
+      const queueImpact = (strength) => {
+        impactStrength = Math.max(impactStrength, strength);
+      };
       const windmillHit = getWindmillCollision(playerShape, this.ctx.windmills || []);
       if (windmillHit) {
+        touchingWindmill = true;
         const overlap = Math.max(0, windmillHit.threshold - Math.sqrt(windmillHit.distSq));
         const push = overlap + 0.5;
         this.gfx.x += windmillHit.normalX * push;
@@ -476,9 +487,15 @@
           this.gfx.x += windmillHit.bladeVelX;
           this.gfx.y += windmillHit.bladeVelY;
           supportedByWindmill = true;
-        } else if (normalSpeed < 0) {
+          if (!wasTouchingWindmill && Math.abs(relativeVy) > 0.85) {
+            queueImpact(Math.max(0.45, Math.abs(relativeVy) * 0.28));
+          }
+        } else if (normalSpeed < -0.55) {
           this.vx -= windmillHit.normalX * normalSpeed;
           this.vy -= windmillHit.normalY * normalSpeed;
+          if (!wasTouchingWindmill) {
+            queueImpact(Math.max(0.5, Math.abs(normalSpeed) * 0.22));
+          }
         }
         playerShape.x = this.gfx.x;
         playerShape.y = this.gfx.y;
@@ -528,6 +545,7 @@
 
         if (bestCollision.side === 'top') {
           this.gfx.y = bestCollision.restPos;
+          queueImpact(Math.max(0.45, Math.abs(prevVy) * 0.28));
           const bounceVy = Math.abs(this.vy) * RESTITUTION;
           this.vy = bounceVy < 0.8 ? 0 : -bounceVy;
           this.vx *= GROUND_FRICTION;
@@ -539,16 +557,19 @@
           }
         } else if (bestCollision.side === 'bottom') {
           this.gfx.y = bestCollision.restPos;
+          queueImpact(Math.max(0.35, Math.abs(prevVy) * 0.2));
           const bounceVy = Math.abs(this.vy) * RESTITUTION;
           this.vy = bounceVy < 0.8 ? 0 : bounceVy;
           this.vx *= GROUND_FRICTION;
         } else if (bestCollision.side === 'left') {
           this.gfx.x = bestCollision.restPos;
+          queueImpact(Math.max(0.3, Math.abs(this.vx) * 0.22));
           const bounceVx = Math.abs(this.vx) * WALL_RESTITUTION;
           this.vx = bounceVx < 0.6 ? 0 : -bounceVx;
           this.vy *= WALL_FRICTION;
         } else if (bestCollision.side === 'right') {
           this.gfx.x = bestCollision.restPos;
+          queueImpact(Math.max(0.3, Math.abs(this.vx) * 0.22));
           const bounceVx = Math.abs(this.vx) * WALL_RESTITUTION;
           this.vx = bounceVx < 0.6 ? 0 : bounceVx;
           this.vy *= WALL_FRICTION;
@@ -558,6 +579,7 @@
       const groundContact = this.ctx.GROUND_Y - this.size;
       if (this.gfx.y > groundContact) {
         this.gfx.y = groundContact;
+        queueImpact(Math.max(0.45, Math.abs(prevVy) * 0.26));
         const bounceVy = Math.abs(this.vy) * RESTITUTION;
         this.vy = bounceVy < 0.8 ? 0 : -bounceVy;
         if (this.vy === 0) supportedByGround = true;
@@ -580,7 +602,16 @@
         }
       }
 
+      if (
+        impactStrength > 0 &&
+        typeof this.ctx.onImpact === 'function' &&
+        (!wasTouchingWindmill || !touchingWindmill || Math.abs(prevVy) > 1.4 || Math.abs(prevVx) > 1.4 || !wasOnGround)
+      ) {
+        this.ctx.onImpact(impactStrength);
+      }
+
       this.onGround = supportedByWindmill || supportedByGround || supportedStickSurface != null;
+      this._touchingWindmill = touchingWindmill;
 
       if (Math.abs(this.vx) < 0.002) this.vx = 0;
       if (Math.abs(this.vy) < 0.002) this.vy = 0;

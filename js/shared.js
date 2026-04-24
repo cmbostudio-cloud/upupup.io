@@ -92,14 +92,22 @@
     return {
       autoSaveEnabled: prefs?.autoSaveEnabled !== false,
       gridVisible: prefs?.gridVisible !== false,
+      audioVolume: Number.isFinite(prefs?.audioVolume)
+        ? Math.max(0, Math.min(1, prefs.audioVolume))
+        : 0.8,
     };
   }
 
   function writePrefs(prefs) {
     try {
+      const current = readPrefs();
       writeJSONStorage(PREFS_KEY, {
-        autoSaveEnabled: Boolean(prefs.autoSaveEnabled),
-        gridVisible: Boolean(prefs.gridVisible),
+        autoSaveEnabled:
+          typeof prefs.autoSaveEnabled === 'boolean' ? prefs.autoSaveEnabled : current.autoSaveEnabled,
+        gridVisible: typeof prefs.gridVisible === 'boolean' ? prefs.gridVisible : current.gridVisible,
+        audioVolume: Number.isFinite(prefs.audioVolume)
+          ? Math.max(0, Math.min(1, prefs.audioVolume))
+          : current.audioVolume,
       });
     } catch {
       return false;

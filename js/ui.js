@@ -5,7 +5,6 @@
     readPrefs,
     writePrefs,
     readStartMode,
-    writeStartMode,
     storageReadSave,
   } = window.UpUpUpShared;
 
@@ -18,22 +17,22 @@
     const menuTabButtons = Array.from(document.querySelectorAll('[data-menu-tab]'));
     const menuPanels = Array.from(document.querySelectorAll('[data-menu-panel]'));
     const gridToggleBtn = document.getElementById('grid-toggle-btn');
-    const saveBtn = document.getElementById('save-btn');
-    const loadBtn = document.getElementById('load-btn');
-    const autosaveBtn = document.getElementById('autosave-btn');
+    const audioVolumeSlider = document.getElementById('audio-volume-slider');
+    const audioVolumeValue = document.getElementById('audio-volume-value');
     const saveStatus = document.getElementById('save-status');
 
     const prefs = readPrefs();
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
+    let audioVolume = prefs.audioVolume;
     let activeTab = 'game';
 
     let actions = {
-      onToggleGrid: () => setStatus('게임이 시작되어야 사용할 수 있습니다.'),
-      onSave: () => setStatus('게임이 시작되어야 사용할 수 있습니다.'),
-      onLoad: () => setStatus('게임이 시작되어야 사용할 수 있습니다.'),
-      onQuit: () => setStatus('게임이 시작되어야 사용할 수 있습니다.'),
-      onToggleAutosave: () => setStatus('게임이 시작되어야 사용할 수 있습니다.'),
+      onStartNewGame: () => setStatus('게임이 시작된 뒤 사용할 수 있습니다.'),
+      onContinueGame: () => setStatus('게임이 시작된 뒤 사용할 수 있습니다.'),
+      onSetGridVisible: () => undefined,
+      onQuit: () => setStatus('게임이 시작된 뒤 사용할 수 있습니다.'),
+      onSetAudioVolume: () => undefined,
     };
 
     function setActions(nextActions = {}) {
@@ -80,7 +79,7 @@
 
     function setCreditBalance(balance) {
       if (menuCreditBalance) {
-        menuCreditBalance.textContent = `보유 크레딧: ${numberOr(balance, 0)}`;
+        menuCreditBalance.textContent = `보유 크레딧 ${numberOr(balance, 0)}`;
       }
     }
 
@@ -96,32 +95,46 @@
     function setGridVisible(visible) {
       gridVisible = Boolean(visible);
       gridToggleBtn.textContent = gridVisible ? '격자 켜짐' : '격자 꺼짐';
-      writePrefs({ autoSaveEnabled, gridVisible });
+      writePrefs({ autoSaveEnabled, gridVisible, audioVolume });
+    }
+
+    function toggleGridVisible() {
+      const nextVisible = !gridVisible;
+      setGridVisible(nextVisible);
+      actions.onSetGridVisible?.(nextVisible);
     }
 
     function setAutosaveEnabled(enabled) {
       autoSaveEnabled = Boolean(enabled);
-      autosaveBtn.textContent = autoSaveEnabled ? '자동 저장 켜짐' : '자동 저장 꺼짐';
-      writePrefs({ autoSaveEnabled, gridVisible });
+      writePrefs({ autoSaveEnabled, gridVisible, audioVolume });
     }
 
-    function startNewGame() {
-      const hasSave = Boolean(storageReadSave());
-      if (hasSave) {
-        const shouldStartFresh = window.confirm('이미 하던 게 있다면 정말 처음부터 진행하시겠습니까?');
-        if (!shouldStartFresh) return;
+    function syncAudioVolumeUI() {
+      if (audioVolumeSlider) {
+        audioVolumeSlider.value = String(Math.round(audioVolume * 100));
+        audioVolumeSlider.style.setProperty('--fill', `${Math.round(audioVolume * 100)}%`);
       }
-      writeStartMode('play');
-      window.location.reload();
+      if (audioVolumeValue) {
+        audioVolumeValue.textContent = `${Math.round(audioVolume * 100)}%`;
+      }
+    }
+
+    function setAudioVolume(volume) {
+      audioVolume = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : audioVolume));
+      writePrefs({ autoSaveEnabled, gridVisible, audioVolume });
+      syncAudioVolumeUI();
+      window.UpUpUpAudio?.getAudioManager?.()?.setVolume(audioVolume);
+      actions.onSetAudioVolume(audioVolume);
     }
 
     function bind() {
-      menuPlayBtn.addEventListener('click', startNewGame);
+      menuPlayBtn.addEventListener('click', () => {
+        actions.onStartNewGame();
+      });
 
       menuContinueBtn.addEventListener('click', () => {
         if (menuContinueBtn.disabled) return;
-        writeStartMode('continue');
-        window.location.reload();
+        actions.onContinueGame();
       });
 
       for (const button of menuTabButtons) {
@@ -131,20 +144,14 @@
       }
 
       gridToggleBtn.addEventListener('click', () => {
-        actions.onToggleGrid();
+        toggleGridVisible();
       });
 
-      saveBtn.addEventListener('click', () => {
-        actions.onSave();
-      });
-
-      loadBtn.addEventListener('click', () => {
-        actions.onLoad();
-      });
-
-      autosaveBtn.addEventListener('click', () => {
-        actions.onToggleAutosave();
-      });
+      if (audioVolumeSlider) {
+        audioVolumeSlider.addEventListener('input', (event) => {
+          setAudioVolume(Number(event.target.value) / 100);
+        });
+      }
     }
 
     bind();
@@ -153,10 +160,11 @@
     setCreditBalance(storageReadSave()?.credits);
     setGridVisible(gridVisible);
     setAutosaveEnabled(autoSaveEnabled);
+    syncAudioVolumeUI();
 
     return {
       getPreferences() {
-        return { autoSaveEnabled, gridVisible };
+        return { autoSaveEnabled, gridVisible, audioVolume };
       },
       setActions,
       setStatus,
@@ -166,7 +174,9 @@
       setCreditBalance,
       updateMenuState,
       setGridVisible,
+      toggleGridVisible,
       setAutosaveEnabled,
+      setAudioVolume,
       readStartMode,
       setActiveTab,
     };
