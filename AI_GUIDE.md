@@ -14,6 +14,7 @@ This document is a compact map of the codebase for future AI edits.
   7. `js/game.js`
 - The game is a PIXI.js browser game with a menu overlay and a canvas-based playfield.
 - No build step is present. Edits are applied directly to source files.
+- `editor/` is a separate, static stage-editing tool for JSON-based layouts.
 
 ## Main Responsibilities
 
@@ -35,6 +36,12 @@ This document is a compact map of the codebase for future AI edits.
   - Web Audio sound effects.
 - `js/game.js`
   - Menu-to-game entry point and action wiring.
+- `editor/`
+  - Standalone developer editor for building and exporting stage JSON.
+  - `editor/index.html` is the entry page.
+  - `editor/editor.js` contains the stage editing logic.
+  - `editor/editor.css` contains the editor layout and styling.
+  - `editor/data/stages/` is the intended home for exported stage files.
 
 ## Runtime Flow
 

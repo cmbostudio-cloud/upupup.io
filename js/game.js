@@ -1,7 +1,6 @@
-(() => {
-  const {
-    storageReadSave,
-  } = window.UpUpUpShared;
+void (async () => {
+  const { ready, storageReadSave, storageDeleteSave, readCreditBalance, writeStartMode } = window.UpUpUpShared;
+  await ready;
 
   const shell = window.UpUpUpUI.createUIController();
   const initialSave = storageReadSave();
@@ -56,6 +55,24 @@
     });
   }
 
+  function abandonInfinite() {
+    const hadInfiniteSave = storageReadSave()?.mode === 'infinite';
+    const deleted = storageDeleteSave?.();
+    if (!deleted) {
+      shell.setStatus('무한 모드를 포기하는 데 실패했습니다.');
+      return;
+    }
+
+    writeStartMode('menu');
+    shell.updateMenuState(null);
+    shell.setCreditBalance(readCreditBalance());
+    shell.setGameView?.('modes');
+    shell.setMenuVisible(true);
+    shell.setStatus(hadInfiniteSave
+      ? '무한 모드를 포기했습니다.'
+      : '포기할 무한 모드가 없습니다.');
+  }
+
   function startStage(stageNumber) {
     const stage = Math.max(1, Math.floor(Number(stageNumber) || 1));
     beginGame({
@@ -66,12 +83,14 @@
   }
 
   shell.updateMenuState(initialSave);
+  shell.setCreditBalance(readCreditBalance());
 
   shell.setActions({
     onStartStageMode: startStageMode,
     onStartInfiniteMode: startInfiniteMode,
     onStartInfiniteNew: startInfiniteNew,
     onContinueInfinite: continueInfinite,
+    onAbandonInfinite: abandonInfinite,
     onStartStage: startStage,
     onSetAudioVolume: (volume) => {
       audio?.setVolume(volume);

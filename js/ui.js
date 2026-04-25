@@ -5,6 +5,8 @@
     readPrefs,
     writePrefs,
     storageReadSave,
+    hasStageEditorStage,
+    getUnlockedStageLimit,
   } = window.UpUpUpShared;
 
   function createUIController() {
@@ -34,10 +36,26 @@
           <span class="stage-clear-reward-label">보상</span>
           <span id="stage-clear-reward-value" class="stage-clear-reward-value">+5 크레딧</span>
         </div>
-        <button id="stage-clear-confirm-btn" class="panel-button secondary stage-clear-confirm-btn" type="button">
-          <span class="panel-button-title">메뉴로</span>
-          <span class="panel-button-desc">메인 메뉴로 돌아갑니다.</span>
-        </button>
+        <button id="stage-clear-confirm-btn" class="panel-button secondary stage-clear-confirm-btn" type="button">메뉴로 돌아가기</button>
+      </div>
+    `;
+
+    const abandonWarningPopup = document.createElement('div');
+    abandonWarningPopup.className = 'abandon-warning-popup';
+    abandonWarningPopup.hidden = true;
+    abandonWarningPopup.innerHTML = `
+      <div class="abandon-warning-panel" role="dialog" aria-modal="true" aria-labelledby="abandon-warning-title" aria-describedby="abandon-warning-desc">
+        <span class="abandon-warning-kicker">주의</span>
+        <h2 id="abandon-warning-title" class="abandon-warning-title">무한 모드를 포기할까요?</h2>
+        <p id="abandon-warning-desc" class="abandon-warning-desc">진행은 사라집니다. 크레딧은 유지됩니다.</p>
+        <div class="abandon-warning-actions">
+          <button id="abandon-cancel-btn" class="panel-button secondary abandon-cancel-btn" type="button">
+            취소
+          </button>
+          <button id="abandon-confirm-btn" class="panel-button secondary abandon-confirm-btn" type="button">
+            중도 포기
+          </button>
+        </div>
       </div>
     `;
 
@@ -61,9 +79,7 @@
           <span class="panel-button-desc">메인 화면으로 돌아갑니다.</span>
         </button>
         <div class="mode-select-copy stage-select-copy">
-          <span class="menu-panel-kicker">일반 모드</span>
           <h3 class="menu-panel-title">스테이지 선택</h3>
-          <p id="stage-select-note" class="menu-note">1단계만 플레이할 수 있고, 2~50단계는 잠금 상태입니다.</p>
         </div>
       </div>
       <div id="stage-grid" class="stage-grid" aria-label="Stage list"></div>
@@ -80,9 +96,7 @@
           <span class="panel-button-desc">메인 화면으로 돌아갑니다.</span>
         </button>
         <div class="mode-select-copy infinite-select-copy">
-          <span class="menu-panel-kicker">무한 모드</span>
           <h3 class="menu-panel-title">무한 모드</h3>
-          <p id="infinite-select-note" class="menu-note">새 게임을 만들거나 저장된 진행을 이어서 시작합니다.</p>
         </div>
       </div>
       <div class="infinite-action-row">
@@ -97,6 +111,13 @@
       </div>
     `;
 
+    const infiniteAbandonBtn = document.createElement('button');
+    infiniteAbandonBtn.id = 'infinite-abandon-btn';
+    infiniteAbandonBtn.type = 'button';
+    infiniteAbandonBtn.className = 'infinite-abandon-btn';
+    infiniteAbandonBtn.textContent = '[중도 포기]';
+    infiniteSelectPanel.appendChild(infiniteAbandonBtn);
+
     if (menuContinueNote) {
       menuContinueNote.insertAdjacentElement('beforebegin', stageSelectPanel);
       menuContinueNote.insertAdjacentElement('beforebegin', infiniteSelectPanel);
@@ -105,17 +126,19 @@
       gamePanel.appendChild(infiniteSelectPanel);
     }
     document.body.appendChild(stageClearPopup);
+    document.body.appendChild(abandonWarningPopup);
 
     const stageBackBtn = stageSelectPanel.querySelector('#stage-back-btn');
     const stageGrid = stageSelectPanel.querySelector('#stage-grid');
-    const stageSelectNote = stageSelectPanel.querySelector('#stage-select-note');
     const infiniteBackBtn = infiniteSelectPanel.querySelector('#infinite-back-btn');
     const infiniteNewBtn = infiniteSelectPanel.querySelector('#infinite-new-btn');
     const infiniteContinueBtn = infiniteSelectPanel.querySelector('#infinite-continue-btn');
-    const infiniteSelectNote = infiniteSelectPanel.querySelector('#infinite-select-note');
     const stageClearRewardValue = stageClearPopup.querySelector('#stage-clear-reward-value');
     const stageClearConfirmBtn = stageClearPopup.querySelector('#stage-clear-confirm-btn');
+    const abandonCancelBtn = abandonWarningPopup.querySelector('#abandon-cancel-btn');
+    const abandonConfirmBtn = abandonWarningPopup.querySelector('#abandon-confirm-btn');
     let stageClearConfirmAction = null;
+    let abandonConfirmAction = null;
 
     let actions = {
       onStartStageMode: () => setStatus('스테이지를 선택하세요.'),
@@ -141,6 +164,16 @@
     function hideStageClearPopup() {
       stageClearConfirmAction = null;
       stageClearPopup.hidden = true;
+    }
+
+    function hideAbandonWarningPopup() {
+      abandonConfirmAction = null;
+      abandonWarningPopup.hidden = true;
+    }
+
+    function showAbandonWarningPopup({ onConfirm = null } = {}) {
+      abandonConfirmAction = typeof onConfirm === 'function' ? onConfirm : null;
+      abandonWarningPopup.hidden = false;
     }
 
     function showStageClearPopup({ stage = 1, reward = 0, onConfirm = null } = {}) {
@@ -188,9 +221,10 @@
     function renderStageCards() {
       if (!stageGrid) return;
 
+      const unlockedLimit = getUnlockedStageLimit();
       stageGrid.innerHTML = '';
       for (let stageNumber = 1; stageNumber <= stageCount; stageNumber++) {
-        const locked = stageNumber !== 1;
+        const locked = stageNumber > unlockedLimit && !hasStageEditorStage(stageNumber);
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'stage-card';
@@ -232,6 +266,9 @@
         menuContinueNote.hidden = !showModes;
       }
       if (stageSelectPanel) {
+        if (showStages) {
+          renderStageCards();
+        }
         stageSelectPanel.hidden = !showStages;
       }
       if (infiniteSelectPanel) {
@@ -270,7 +307,7 @@
 
     function setCreditBalance(balance) {
       if (menuCreditBalance) {
-        menuCreditBalance.textContent = `Current credits: ${numberOr(balance, 0)}`;
+        menuCreditBalance.textContent = `보유 크레딧 ${numberOr(balance, 0)}`;
       }
     }
 
@@ -278,18 +315,11 @@
       const hasSave = Boolean(saved);
       const hasInfiniteSave = hasSave && saved?.mode === 'infinite';
 
-      if (stageSelectNote) {
-        stageSelectNote.textContent = '1단계만 플레이할 수 있고, 2~50단계는 잠금 상태입니다.';
-      }
-
       if (infiniteContinueBtn) {
         infiniteContinueBtn.disabled = !hasInfiniteSave;
       }
-
-      if (infiniteSelectNote) {
-        infiniteSelectNote.textContent = hasInfiniteSave
-          ? `마지막 저장: ${formatTime(saved.savedAt ?? Date.now())} | 점수 ${numberOr(saved.score, 0)}`
-          : '저장된 무한 모드 기록이 없습니다.';
+      if (infiniteAbandonBtn) {
+        infiniteAbandonBtn.disabled = !hasInfiniteSave;
       }
 
       if (menuContinueNote) {
@@ -304,7 +334,7 @@
     function setGridVisible(visible) {
       gridVisible = Boolean(visible);
       if (gridToggleBtn) {
-        gridToggleBtn.textContent = gridVisible ? 'Grid On' : 'Grid Off';
+        gridToggleBtn.textContent = gridVisible ? '그리드 켜짐' : '그리드 꺼짐';
       }
       writePrefs({ autoSaveEnabled, gridVisible, audioVolume });
     }
@@ -388,6 +418,16 @@
         actions.onContinueInfinite?.();
       });
 
+      infiniteAbandonBtn?.addEventListener('click', () => {
+        if (infiniteAbandonBtn.disabled) return;
+        const audio = window.UpUpUpAudio?.getAudioManager?.();
+        audio?.unlock?.();
+        audio?.playTabPrev?.();
+        showAbandonWarningPopup({
+          onConfirm: () => actions.onAbandonInfinite?.(),
+        });
+      });
+
       stageGrid?.addEventListener('click', (event) => {
         const button = event.target.closest('button[data-stage-number]');
         if (!button || button.disabled) return;
@@ -428,6 +468,16 @@
         hideStageClearPopup();
         callback?.();
       });
+
+      abandonCancelBtn?.addEventListener('click', () => {
+        hideAbandonWarningPopup();
+      });
+
+      abandonConfirmBtn?.addEventListener('click', () => {
+        const callback = abandonConfirmAction;
+        hideAbandonWarningPopup();
+        callback?.();
+      });
     }
 
     bind();
@@ -456,6 +506,8 @@
       setGameView,
       showStageClearPopup,
       hideStageClearPopup,
+      showAbandonWarningPopup,
+      hideAbandonWarningPopup,
     };
   }
 

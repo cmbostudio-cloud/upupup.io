@@ -20,13 +20,22 @@
     mode = 'infinite',
     stage = 1,
     seed = 0x12345678,
+    stageLayout = null,
     collectedCreditIds = [],
+    collectedStarIds = [],
     collectedPortalIds = [],
   }) {
     const rng = createRng(seed);
-    const collectedCreditIdSet = new Set(collectedCreditIds);
-    const collectedPortalIdSet = new Set(collectedPortalIds);
-    const isStageOne = mode === 'stage' && stage === 1;
+    const toIdKey = (value) => String(value);
+    const collectedCreditIdSet = new Set(collectedCreditIds.map(toIdKey));
+    const collectedStarIdSet = new Set(collectedStarIds.map(toIdKey));
+    const collectedPortalIdSet = new Set(collectedPortalIds.map(toIdKey));
+    const hasCustomStageLayout =
+      mode === 'stage' &&
+      stageLayout &&
+      Array.isArray(stageLayout.objects) &&
+      stageLayout.objects.length > 0;
+    const isStageOne = mode === 'stage' && stage === 1 && !hasCustomStageLayout;
     const grid = new PIXI.Graphics();
     world.addChild(grid);
 
@@ -56,7 +65,7 @@
     const movingSticks = [];
     const windmills = [];
     const credits = [];
-    const portals = [];
+    const stars = [];
     const chunks = new Map();
     const recentSpawns = [];
     const recentStickSpawns = [];
@@ -520,6 +529,72 @@
       return surface;
     }
 
+    function addMovingStickAt(x, y, width = STICK_LENGTH, height = STICK_HEIGHT, speed = null, direction = null) {
+      const chunk = ensureChunk(getChunkIndex(y));
+      const capRadius = Math.max(1, Math.round(height * 0.5));
+      const minX = 0;
+      const maxX = Math.max(0, MAP_W - width);
+      const baseX = clamp(Math.round(x), minX, maxX);
+      const hasSpeed = Number.isFinite(speed) && speed !== 0;
+      const initialDirection =
+        direction === 'left' || direction === 'right'
+          ? direction
+          : hasSpeed
+            ? speed < 0
+              ? 'left'
+              : 'right'
+            : rng.next() < 0.5
+              ? 'left'
+              : 'right';
+      const magnitude = hasSpeed ? Math.max(0.1, Math.abs(speed)) : randRange(0.9, 1.7);
+      const actualSpeed = magnitude * (initialDirection === 'left' ? -1 : 1);
+      const stick = new PIXI.Graphics();
+      drawStickShape(stick, 0, 0, width, height, capRadius);
+      stick.x = baseX;
+      stick.y = Math.round(y);
+      stick.hitArea = new PIXI.RoundedRectangle(0, 0, width, height, capRadius);
+      chunk.container.addChild(stick);
+
+      const surface = {
+        x: baseX,
+        y: Math.round(y),
+        width,
+        height,
+        radius: capRadius,
+        chunk,
+        gfx: stick,
+        minX,
+        maxX,
+        speed: actualSpeed,
+        prevX: baseX,
+        deltaX: 0,
+      };
+      stickSurfaces.push(surface);
+      movingSticks.push(surface);
+      chunk.stickSurfaces.push(surface);
+      chunk.movingSticks.push(surface);
+      rememberMovingStickSpawn({
+        x: surface.x + width / 2,
+        y: surface.y,
+        width,
+        height,
+      });
+      rememberStickSpawn({
+        kind: 'moving-stick',
+        x: surface.x,
+        y: surface.y,
+        width,
+        height,
+      });
+      rememberSpawn({
+        kind: 'moving-stick',
+        x: surface.x + width / 2,
+        y: surface.y + height / 2,
+        radius: getStickSpawnRadius(width, height),
+      });
+      return surface;
+    }
+
     function addSideStick(y, width = STICK_LENGTH, height = STICK_HEIGHT) {
       const x = pickStickX(y, width, height, getPreferredObstacleSide());
       const radius = getStickSpawnRadius(width, height);
@@ -586,6 +661,15 @@
         y: centerY,
         radius: getWindmillSpawnRadius(scale),
       });
+      return windmill;
+    }
+
+    function addWindmillAt(x, y, width = 280, height = 280, rotationSpeed = null) {
+      const scale = Math.max(width, height) / 280;
+      const windmill = addWindmill(Math.round(x + width / 2), Math.round(y + height / 2), scale);
+      if (Number.isFinite(rotationSpeed)) {
+        windmill.speed = rotationSpeed;
+      }
       return windmill;
     }
 
@@ -729,7 +813,7 @@
       };
 
       credits.push(item);
-      if (collectedCreditIdSet.has(item.id)) {
+      if (collectedCreditIdSet.has(toIdKey(item.id))) {
         item.collected = true;
         credit.visible = false;
         credit.renderable = false;
@@ -747,18 +831,18 @@
       return item;
     }
 
-    function addPortal(x, y, width = PORTAL_SIZE, height = PORTAL_SIZE) {
+    function addStar(x, y, width = PORTAL_SIZE, height = PORTAL_SIZE, sourceId = null) {
       const chunk = ensureChunk(getChunkIndex(y));
-      const portal = new PIXI.Container();
-      drawPortalShape(portal, width, height);
+      const star = new PIXI.Container();
+      drawPortalShape(star, width, height);
       const centerX = Math.round(x + width / 2);
       const centerY = Math.round(y + height / 2);
-      portal.x = Math.round(x);
-      portal.y = Math.round(y);
-      chunk.container.addChild(portal);
+      star.x = Math.round(x);
+      star.y = Math.round(y);
+      chunk.container.addChild(star);
 
       const item = {
-        id: portals.length,
+        id: sourceId ?? stars.length,
         x: Math.round(x),
         y: Math.round(y),
         width,
@@ -768,29 +852,36 @@
         radius: Math.max(width, height) / 2,
         collected: false,
         chunk,
-        gfx: portal,
+        gfx: star,
         phase: rng.next() * Math.PI * 2,
         pulseSpeed: 1.8 + rng.next() * 0.7,
         pulseAmplitude: 0.055 + rng.next() * 0.02,
       };
 
-      portals.push(item);
-      if (collectedPortalIdSet.has(item.id)) {
+      stars.push(item);
+      if (collectedStarIdSet.has(toIdKey(item.id)) || collectedPortalIdSet.has(toIdKey(item.id))) {
         item.collected = true;
-        portal.visible = false;
-        portal.renderable = false;
+        star.visible = false;
+        star.renderable = false;
       }
+      if (!chunk.stars) {
+        chunk.stars = [];
+      }
+      chunk.stars.push(item);
       if (!chunk.portals) {
-        chunk.portals = [];
+        chunk.portals = chunk.stars;
       }
-      chunk.portals.push(item);
       rememberSpawn({
-        kind: 'portal',
+        kind: 'star',
         x: item.centerX,
         y: item.centerY,
         radius: item.radius,
       });
       return item;
+    }
+
+    function addPortal(x, y, width = PORTAL_SIZE, height = PORTAL_SIZE, sourceId = null) {
+      return addStar(x, y, width, height, sourceId);
     }
 
     function spawnRandomCredit(y, anchorX, width = STICK_LENGTH) {
@@ -873,12 +964,45 @@
       const rightStarX = Math.round(MAP_W / 2 + 150 - halfStar);
       const lowerStarY = Math.round(stickY - 84);
       const upperStarY = Math.round(stickY - 186);
-      addPortal(leftStarX, lowerStarY, starSize, starSize);
-      addPortal(centerStarX, upperStarY, starSize, starSize);
-      addPortal(rightStarX, lowerStarY, starSize, starSize);
+      addStar(leftStarX, lowerStarY, starSize, starSize);
+      addStar(centerStarX, upperStarY, starSize, starSize);
+      addStar(rightStarX, lowerStarY, starSize, starSize);
+    }
+
+    function createCustomStageLayout(layout) {
+      for (const object of layout?.objects ?? []) {
+        if (!object) continue;
+        const type =
+          object.type === 'star' || object.type === 'portal'
+            ? 'star'
+            : object.type === 'windmill'
+              ? 'windmill'
+              : object.type === 'moving-stick' || object.type === 'movingStick'
+                ? 'moving-stick'
+                : 'stick';
+        const x = Math.round(Number(object.x) || 0);
+        const y = Math.round(Number(object.y) || 0);
+        const width = Math.max(1, Math.round(Number(object.width) || (type === 'star' ? PORTAL_SIZE : type === 'windmill' ? 280 : 240)));
+        const height = Math.max(1, Math.round(Number(object.height) || (type === 'star' ? PORTAL_SIZE : type === 'windmill' ? 280 : STICK_HEIGHT)));
+
+        if (type === 'star') {
+          addStar(x, y, width, height, object.id);
+        } else if (type === 'windmill') {
+          addWindmillAt(x, y, width, height, Number(object.rotationSpeed));
+        } else if (type === 'moving-stick') {
+          addMovingStickAt(x, y, width, height, Number(object.speed), object.direction);
+        } else {
+          addStick(x, y, width, height);
+        }
+      }
     }
 
     function seedInitialObjects() {
+      if (hasCustomStageLayout) {
+        createCustomStageLayout(stageLayout);
+        return;
+      }
+
       if (isStageOne) {
         createStageOneLayout();
         return;
@@ -892,7 +1016,7 @@
     }
 
     function ensureGeneratedAbove(targetY) {
-      if (isStageOne) return;
+      if (isStageOne || hasCustomStageLayout) return;
       while (nextSpawnY > targetY) {
         addSpawnStep(nextSpawnY);
         nextSpawnY -= randRange(220, 320);
@@ -919,7 +1043,7 @@
     function collectCredit(credit) {
       if (!credit || credit.collected) return false;
       credit.collected = true;
-      collectedCreditIdSet.add(credit.id);
+      collectedCreditIdSet.add(toIdKey(credit.id));
       if (credit.gfx) {
         credit.gfx.visible = false;
         credit.gfx.renderable = false;
@@ -960,6 +1084,7 @@
       stickSurfaces: [],
       windmills: [],
       credits: [],
+      stars: [],
       portals: [],
     };
 
@@ -1000,7 +1125,7 @@
       const activeStickSurfaces = [];
       const activeWindmills = [];
       const activeCredits = [];
-      const activePortals = [];
+      const activeStars = [];
 
       for (let index = minIndex; index <= maxIndex; index++) {
         const chunk = chunks.get(index);
@@ -1010,8 +1135,8 @@
         if (chunk.credits) {
           activeCredits.push(...chunk.credits);
         }
-        if (chunk.portals) {
-          activePortals.push(...chunk.portals);
+        if (chunk.stars) {
+          activeStars.push(...chunk.stars);
         }
       }
 
@@ -1020,7 +1145,8 @@
         stickSurfaces: activeStickSurfaces,
         windmills: activeWindmills,
         credits: activeCredits,
-        portals: activePortals,
+        stars: activeStars,
+        portals: activeStars,
       };
       return lastActiveObjects;
     }
@@ -1040,15 +1166,16 @@
     function getState() {
       return {
         seed,
-        nextSpawnY,
-        pathX,
+        nextSpawnY: hasCustomStageLayout ? null : nextSpawnY,
+        pathX: hasCustomStageLayout ? null : pathX,
         collectedCreditIds: credits.filter((credit) => credit.collected).map((credit) => credit.id),
-        collectedPortalIds: portals.filter((portal) => portal.collected).map((portal) => portal.id),
+        collectedStarIds: stars.filter((star) => star.collected).map((star) => star.id),
+        collectedPortalIds: stars.filter((star) => star.collected).map((star) => star.id),
       };
     }
 
     seedInitialObjects();
-    if (!isStageOne) {
+    if (!isStageOne && !hasCustomStageLayout) {
       if (movingSticks.length === 0) {
         spawnRandomMovingStick(GROUND_Y - randRange(300, 440), Math.round(STICK_LENGTH * randRange(0.62, 0.78)), STICK_HEIGHT);
       }
@@ -1064,7 +1191,9 @@
       movingSticks,
       windmills,
       credits,
-      portals,
+      stars,
+      portals: stars,
+      addStar,
       syncToCamera,
       generateTo,
       getState,

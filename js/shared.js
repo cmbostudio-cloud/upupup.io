@@ -5,6 +5,28 @@
   const SAVE_VERSION = 1;
   const AUTOSAVE_INTERVAL_MS = 12000;
   const START_MODE_KEY = 'upupup.io.startMode.v1';
+  const SAVE_TOMBSTONE_KEY = 'upupup.io.saveDeleted.v1';
+  const CREDIT_BALANCE_KEY = 'upupup.io.creditBalance.v1';
+  const INFINITE_BEST_SCORE_KEY = 'upupup.io.infiniteBestScore.v1';
+  const STAGE_PROGRESS_KEY = 'upupup.io.stageProgress.v1';
+  const STAGE_EDITOR_DRAFT_KEY = 'upupup.stage-editor.draft.v1';
+  const STAGE_EDITOR_STAGE_PREFIX = 'upupup.stage-editor.stage.v1.';
+
+  const SECURE_DB_NAME = 'upupup.io.secure.v1';
+  const SECURE_DB_VERSION = 1;
+  const SECURE_STORE_NAME = 'vault';
+  const SECURE_KEY_RECORD = 'save-key';
+  const SECURE_SAVE_RECORD = 'save-state';
+  const SECURE_STAGE_PROGRESS_RECORD = 'stage-progress';
+
+  let secureDb = null;
+  let secureDbPromise = null;
+  let secureKey = null;
+  let secureKeyPromise = null;
+  let secureStorageReady = false;
+  let secureStorageSupported = false;
+  let cachedSave = null;
+  let cachedStageProgress = { maxUnlockedStage: 1 };
 
   function getViewportSize() {
     const viewport = window.visualViewport;
@@ -127,6 +149,14 @@
     return Number.isFinite(value) ? value : fallback;
   }
 
+  function normalizeScore(value) {
+    return Math.max(0, Math.floor(Number(value) || 0));
+  }
+
+  function normalizeCreditBalance(value) {
+    return Math.max(0, Math.floor(Number(value) || 0));
+  }
+
   function writeStartMode(mode) {
     try {
       sessionStorage.setItem(START_MODE_KEY, mode);
@@ -136,7 +166,256 @@
     return true;
   }
 
-  function storageReadSave() {
+  function readCreditBalance() {
+    return normalizeCreditBalance(readJSONStorage(CREDIT_BALANCE_KEY));
+  }
+
+  function writeCreditBalance(balance) {
+    try {
+      writeJSONStorage(CREDIT_BALANCE_KEY, normalizeCreditBalance(balance));
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  function normalizeStageNumber(stageNumber) {
+    const value = Number(stageNumber);
+    return Math.max(1, Math.floor(Number.isFinite(value) ? value : 1));
+  }
+
+  function normalizeIdList(value) {
+    if (!Array.isArray(value)) return [];
+    const output = [];
+    const seen = new Set();
+    for (const item of value) {
+      const id = String(item);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      output.push(id);
+    }
+    return output;
+  }
+
+  function normalizeMapState(mapState, seedFallback = 0) {
+    const source = mapState && typeof mapState === 'object' ? mapState : {};
+    const nextSpawnY = Number.isFinite(source.nextSpawnY) ? Math.max(0, Math.floor(source.nextSpawnY)) : null;
+    const pathX = Number.isFinite(source.pathX) ? Math.max(0, Math.floor(source.pathX)) : null;
+    const seed = Number.isFinite(source.seed) ? source.seed >>> 0 : seedFallback >>> 0;
+    return {
+      seed,
+      nextSpawnY,
+      pathX,
+      collectedCreditIds: normalizeIdList(source.collectedCreditIds),
+      collectedStarIds: normalizeIdList(source.collectedStarIds),
+      collectedPortalIds: normalizeIdList(source.collectedPortalIds),
+    };
+  }
+
+  function normalizeSaveData(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+
+    const mode = raw.mode === 'stage' ? 'stage' : 'infinite';
+    const stage = normalizeStageNumber(raw.stage);
+    const seed = Number.isFinite(raw.seed) ? raw.seed >>> 0 : createSeed();
+    const player = raw.player && typeof raw.player === 'object' ? raw.player : {};
+    const map = normalizeMapState(raw.map, seed);
+
+    return {
+      version: SAVE_VERSION,
+      savedAt: Number.isFinite(raw.savedAt) ? Math.max(0, Math.floor(raw.savedAt)) : Date.now(),
+      mode,
+      stage,
+      seed,
+      player: {
+        x: Number.isFinite(player.x) ? Number(player.x) : 0,
+        y: Number.isFinite(player.y) ? Number(player.y) : 0,
+        vx: Number.isFinite(player.vx) ? Number(player.vx) : 0,
+        vy: Number.isFinite(player.vy) ? Number(player.vy) : 0,
+        onGround: Boolean(player.onGround),
+      },
+      map,
+      score: Math.max(0, Math.floor(Number(raw.score) || 0)),
+      credits: Math.max(0, Math.floor(Number(raw.credits) || 0)),
+    };
+  }
+
+  function normalizeStageProgressData(raw) {
+    return {
+      maxUnlockedStage: Math.max(1, Math.floor(Number(raw?.maxUnlockedStage) || 1)),
+    };
+  }
+
+  function deepFreeze(value) {
+    if (!value || typeof value !== 'object' || Object.isFrozen(value)) {
+      return value;
+    }
+    Object.freeze(value);
+    for (const key of Object.keys(value)) {
+      deepFreeze(value[key]);
+    }
+    return value;
+  }
+
+  function txDone(tx) {
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+      tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+    });
+  }
+
+  function requestToPromise(request) {
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
+    });
+  }
+
+  function openSecureDb() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB || !window.crypto?.subtle) {
+        reject(new Error('Secure storage unavailable'));
+        return;
+      }
+
+      const request = indexedDB.open(SECURE_DB_NAME, SECURE_DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(SECURE_STORE_NAME)) {
+          db.createObjectStore(SECURE_STORE_NAME);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('IndexedDB open failed'));
+      request.onblocked = () => reject(new Error('IndexedDB open blocked'));
+    });
+  }
+
+  async function getSecureDb() {
+    if (secureDb) return secureDb;
+    if (!secureDbPromise) {
+      secureDbPromise = openSecureDb().then((db) => {
+        secureDb = db;
+        return db;
+      });
+    }
+    secureDb = await secureDbPromise;
+    return secureDb;
+  }
+
+  async function getSecureKey() {
+    if (secureKey) return secureKey;
+    if (secureKeyPromise) {
+      secureKey = await secureKeyPromise;
+      return secureKey;
+    }
+
+    secureKeyPromise = (async () => {
+      const db = await getSecureDb();
+      const tx = db.transaction(SECURE_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(SECURE_STORE_NAME);
+      const existing = await requestToPromise(store.get(SECURE_KEY_RECORD));
+
+      if (existing?.key) {
+        await txDone(tx);
+        return existing.key;
+      }
+
+      const key = await window.crypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+      await requestToPromise(store.put({ key }, SECURE_KEY_RECORD));
+      await txDone(tx);
+      return key;
+    })();
+
+    secureKey = await secureKeyPromise;
+    return secureKey;
+  }
+
+  function uint8ToBase64(bytes) {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    return btoa(binary);
+  }
+
+  function base64ToUint8(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  async function encryptRecord(recordName, data) {
+    const key = await getSecureKey();
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encoder = new TextEncoder();
+    const payload = encoder.encode(JSON.stringify(data));
+    const additionalData = encoder.encode(`${SECURE_DB_NAME}:${recordName}:v1`);
+    const encrypted = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData },
+      key,
+      payload
+    );
+
+    return {
+      version: 1,
+      iv: uint8ToBase64(iv),
+      ciphertext: uint8ToBase64(new Uint8Array(encrypted)),
+    };
+  }
+
+  async function decryptRecord(recordName, record) {
+    if (!record || record.version !== 1) return null;
+    if (typeof record.iv !== 'string' || typeof record.ciphertext !== 'string') return null;
+
+    const key = await getSecureKey();
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+    const iv = base64ToUint8(record.iv);
+    const ciphertext = base64ToUint8(record.ciphertext);
+    const additionalData = encoder.encode(`${SECURE_DB_NAME}:${recordName}:v1`);
+
+    try {
+      const plaintext = await window.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv, additionalData },
+        key,
+        ciphertext
+      );
+      return JSON.parse(decoder.decode(plaintext));
+    } catch {
+      return null;
+    }
+  }
+
+  async function readSecureRecord(recordName) {
+    const db = await getSecureDb();
+    const tx = db.transaction(SECURE_STORE_NAME, 'readonly');
+    const store = tx.objectStore(SECURE_STORE_NAME);
+    const record = await requestToPromise(store.get(recordName));
+    await txDone(tx);
+    return record ?? null;
+  }
+
+  async function writeSecureRecord(recordName, record) {
+    const db = await getSecureDb();
+    const tx = db.transaction(SECURE_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(SECURE_STORE_NAME);
+    await requestToPromise(store.put(record, recordName));
+    await txDone(tx);
+    return true;
+  }
+
+  function readLegacySave() {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return null;
@@ -146,8 +425,232 @@
     }
   }
 
-  function storageWriteSave(data) {
+  function writeLegacySave(data) {
     localStorage.setItem(SAVE_KEY, encodeSave(data));
+  }
+
+  function readLegacyStageProgress() {
+    const progress = readJSONStorage(STAGE_PROGRESS_KEY);
+    return normalizeStageProgressData(progress);
+  }
+
+  function writeLegacyStageProgress(progress) {
+    try {
+      const current = readLegacyStageProgress();
+      writeJSONStorage(STAGE_PROGRESS_KEY, {
+        maxUnlockedStage: Math.max(
+          1,
+          Math.floor(Number.isFinite(progress?.maxUnlockedStage)
+            ? progress.maxUnlockedStage
+            : current.maxUnlockedStage)
+        ),
+      });
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  async function loadSecureCache() {
+    secureStorageSupported = Boolean(window.indexedDB && window.crypto?.subtle);
+    if (!secureStorageSupported) {
+      cachedSave = deepFreeze(normalizeSaveData(readLegacySave()));
+      cachedStageProgress = deepFreeze(normalizeStageProgressData(readLegacyStageProgress()));
+      secureStorageReady = true;
+      return;
+    }
+
+    try {
+      await getSecureKey();
+      const [saveRecord, progressRecord] = await Promise.all([
+        readSecureRecord(SECURE_SAVE_RECORD),
+        readSecureRecord(SECURE_STAGE_PROGRESS_RECORD),
+      ]);
+
+      const decodedSave = await decryptRecord(SECURE_SAVE_RECORD, saveRecord);
+      const decodedProgress = await decryptRecord(SECURE_STAGE_PROGRESS_RECORD, progressRecord);
+      const legacySave = normalizeSaveData(readLegacySave());
+      const legacyProgress = normalizeStageProgressData(readLegacyStageProgress());
+      cachedSave = readJSONStorage(SAVE_TOMBSTONE_KEY)
+        ? null
+        : deepFreeze(normalizeSaveData(decodedSave) ?? legacySave);
+      cachedStageProgress = deepFreeze(normalizeStageProgressData(decodedProgress) ?? legacyProgress);
+
+      if (!saveRecord) {
+        if (legacySave) {
+          cachedSave = deepFreeze(legacySave);
+          const record = await encryptRecord(SECURE_SAVE_RECORD, legacySave);
+          await writeSecureRecord(SECURE_SAVE_RECORD, record);
+        }
+      }
+
+      if (!progressRecord) {
+        cachedStageProgress = deepFreeze(legacyProgress);
+        const record = await encryptRecord(SECURE_STAGE_PROGRESS_RECORD, legacyProgress);
+        await writeSecureRecord(SECURE_STAGE_PROGRESS_RECORD, record);
+      }
+    } catch {
+      secureStorageSupported = false;
+      secureDb = null;
+      secureDbPromise = null;
+      secureKey = null;
+      secureKeyPromise = null;
+      cachedSave = deepFreeze(normalizeSaveData(readLegacySave()));
+      cachedStageProgress = deepFreeze(normalizeStageProgressData(readLegacyStageProgress()));
+    } finally {
+      secureStorageReady = true;
+    }
+  }
+
+  const ready = loadSecureCache();
+
+  function storageReadSave() {
+    if (readJSONStorage(SAVE_TOMBSTONE_KEY)) {
+      return null;
+    }
+    if (secureStorageReady && cachedSave) {
+      return cachedSave;
+    }
+    return normalizeSaveData(readLegacySave());
+  }
+
+  async function storageWriteSave(data) {
+    const normalized = normalizeSaveData(data);
+    if (!normalized) return false;
+
+    if (secureStorageSupported) {
+      try {
+        const record = await encryptRecord(SECURE_SAVE_RECORD, normalized);
+        await writeSecureRecord(SECURE_SAVE_RECORD, record);
+      } catch {
+        // Fall back to the localStorage backup below.
+      }
+    }
+
+    try {
+      writeLegacySave(normalized);
+      cachedSave = deepFreeze(normalized);
+      writeJSONStorage(SAVE_TOMBSTONE_KEY, false);
+      return true;
+    } catch {
+      if (secureStorageSupported) {
+        try {
+          cachedSave = deepFreeze(normalized);
+          writeJSONStorage(SAVE_TOMBSTONE_KEY, false);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    }
+  }
+
+  function readStageProgress() {
+    if (secureStorageReady && cachedStageProgress) {
+      return cachedStageProgress;
+    }
+    return normalizeStageProgressData(readLegacyStageProgress());
+  }
+
+  async function writeStageProgress(progress) {
+    const normalized = normalizeStageProgressData(progress);
+    if (secureStorageSupported) {
+      try {
+        const record = await encryptRecord(SECURE_STAGE_PROGRESS_RECORD, normalized);
+        await writeSecureRecord(SECURE_STAGE_PROGRESS_RECORD, record);
+      } catch {
+        // Fall back to the localStorage backup below.
+      }
+    }
+
+    try {
+      writeLegacyStageProgress(normalized);
+      cachedStageProgress = deepFreeze(normalized);
+      return true;
+      } catch {
+      if (secureStorageSupported) {
+        try {
+          cachedStageProgress = deepFreeze(normalized);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    }
+  }
+
+  async function unlockStage(stageNumber) {
+    const current = readStageProgress();
+    const nextUnlocked = Math.max(current.maxUnlockedStage, normalizeStageNumber(stageNumber) + 1);
+    return writeStageProgress({ maxUnlockedStage: nextUnlocked });
+  }
+
+  function getUnlockedStageLimit() {
+    return readStageProgress().maxUnlockedStage;
+  }
+
+  function getStageEditorStageKey(stageNumber) {
+    return `${STAGE_EDITOR_STAGE_PREFIX}${normalizeStageNumber(stageNumber)}`;
+  }
+
+  function readStageEditorDraft() {
+    return readJSONStorage(STAGE_EDITOR_DRAFT_KEY);
+  }
+
+  function writeStageEditorDraft(data) {
+    try {
+      writeJSONStorage(STAGE_EDITOR_DRAFT_KEY, data);
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  function storageDeleteSave() {
+    try {
+      writeLegacySave(null);
+      writeJSONStorage(SAVE_TOMBSTONE_KEY, true);
+      cachedSave = null;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function readInfiniteBestScore() {
+    try {
+      return normalizeScore(readJSONStorage(INFINITE_BEST_SCORE_KEY));
+    } catch {
+      return 0;
+    }
+  }
+
+  function writeInfiniteBestScore(score) {
+    try {
+      writeJSONStorage(INFINITE_BEST_SCORE_KEY, normalizeScore(score));
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  function readStageEditorStage(stageNumber) {
+    return readJSONStorage(getStageEditorStageKey(stageNumber));
+  }
+
+  function writeStageEditorStage(stageNumber, data) {
+    try {
+      writeJSONStorage(getStageEditorStageKey(stageNumber), data);
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  function hasStageEditorStage(stageNumber) {
+    return Boolean(readStageEditorStage(stageNumber));
   }
 
   window.UpUpUpShared = {
@@ -170,7 +673,27 @@
     formatTime,
     numberOr,
     writeStartMode,
+    readCreditBalance,
+    writeCreditBalance,
     storageReadSave,
     storageWriteSave,
+    storageDeleteSave,
+    readInfiniteBestScore,
+    writeInfiniteBestScore,
+    STAGE_PROGRESS_KEY,
+    STAGE_EDITOR_DRAFT_KEY,
+    STAGE_EDITOR_STAGE_PREFIX,
+    readStageProgress,
+    writeStageProgress,
+    unlockStage,
+    getUnlockedStageLimit,
+    normalizeStageNumber,
+    getStageEditorStageKey,
+    readStageEditorDraft,
+    writeStageEditorDraft,
+    readStageEditorStage,
+    writeStageEditorStage,
+    hasStageEditorStage,
+    ready,
   };
 })();

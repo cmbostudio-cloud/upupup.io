@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   const { Square } = window.UpUpUpLogic;
   const { buildMap } = window.UpUpUpMap;
   const {
@@ -9,9 +9,15 @@
     formatTime,
     AUTOSAVE_INTERVAL_MS,
     SAVE_VERSION,
+    readCreditBalance,
+    writeCreditBalance,
+    readInfiniteBestScore,
+    writeInfiniteBestScore,
     storageReadSave,
     storageWriteSave,
     writeStartMode,
+    readStageEditorStage,
+    unlockStage,
   } = window.UpUpUpShared;
 
   function startGame({ canvas, shell, initialSave, audio, mode = 'infinite', stage = 1 }) {
@@ -21,25 +27,109 @@
     const PIXEL_RATIO = IS_TOUCH_DEVICE
       ? Math.min(window.devicePixelRatio || 1, 1.5)
       : window.devicePixelRatio || 1;
-    const MAP_W = 900;
-    const GRID = 60;
-    const MAX_PULL = GRID * 4.5;
-    const GROUND_Y = 2040;
-    const PLAYER_RADIUS = 8;
-    const PLAYER_BORDER = 3;
-    const STAGE_CLEAR_REWARD = 5;
     const gameMode = mode === 'stage' ? 'stage' : 'infinite';
     const gameStage = Math.max(1, Math.floor(Number.isFinite(Number(stage)) ? Number(stage) : 1));
+    const DEFAULT_MAP_W = 900;
+    const DEFAULT_GROUND_Y = 2040;
+    const DEFAULT_GRID = 60;
     const createStageSeed = (stageNumber) => {
       const base = 0x6d2b79f5 ^ Math.imul(stageNumber, 0x9e3779b9);
       return base >>> 0;
     };
+
+    function normalizeStageObject(input = {}, index = 0) {
+      const type =
+        input.type === 'star' || input.type === 'portal'
+          ? 'star'
+          : input.type === 'windmill'
+            ? 'windmill'
+            : input.type === 'moving-stick' || input.type === 'movingStick'
+              ? 'moving-stick'
+              : 'stick';
+      const defaults =
+        type === 'star'
+          ? { width: 28, height: 28 }
+          : type === 'windmill'
+            ? { width: 280, height: 280 }
+            : { width: 240, height: 18 };
+
+      const object = {
+        id: String(input.id || `${type}-${index + 1}`),
+        type,
+        x: Math.max(0, Math.round(numberOr(input.x, 100 + index * 24))),
+        y: Math.max(0, Math.round(numberOr(input.y, 1400 + index * 24))),
+        width: Math.max(1, Math.round(numberOr(input.width, defaults.width))),
+        height: Math.max(1, Math.round(numberOr(input.height, defaults.height))),
+      };
+
+      if (type === 'moving-stick' && Number.isFinite(Number(input.speed))) {
+        const rawSpeed = Number(input.speed);
+        const rawDirection = String(input.direction || '').toLowerCase();
+        object.speed = Math.max(0.1, Math.abs(rawSpeed));
+        if (rawDirection === 'left' || rawDirection === 'right') {
+          object.direction = rawDirection;
+        } else {
+          object.direction = rawSpeed < 0 ? 'left' : 'right';
+        }
+      } else if (type === 'moving-stick') {
+        object.speed = 1.2;
+        object.direction = String(input.direction || '').toLowerCase() === 'left' ? 'left' : 'right';
+      }
+      if (type === 'windmill' && Number.isFinite(Number(input.rotationSpeed))) {
+        object.rotationSpeed = Number(input.rotationSpeed);
+      }
+
+      return object;
+    }
+
+    function normalizeStageData(raw) {
+      if (!raw || typeof raw !== 'object') return null;
+
+      const stageNumber = Math.max(1, Math.floor(numberOr(raw.stage, gameStage)));
+      const mapWidth = Math.max(200, Math.round(numberOr(raw?.settings?.mapWidth, DEFAULT_MAP_W)));
+      const groundY = Math.max(0, Math.round(numberOr(raw?.settings?.groundY, DEFAULT_GROUND_Y)));
+      const gridSize = Math.max(1, Math.round(numberOr(raw?.settings?.gridSize, DEFAULT_GRID)));
+
+      return {
+        version: 1,
+        stage: stageNumber,
+        name: String(raw.name || `?ㅽ뀒?댁? ${stageNumber}`),
+        settings: {
+          mapWidth,
+          groundY,
+          gridSize,
+        },
+        objects: Array.isArray(raw.objects)
+          ? raw.objects.map((object, index) => normalizeStageObject(object, index))
+          : [],
+      };
+    }
+
+    const stageLayout = gameMode === 'stage' ? normalizeStageData(readStageEditorStage(gameStage)) : null;
+    const MAP_W = stageLayout?.settings.mapWidth ?? DEFAULT_MAP_W;
+    const GRID = stageLayout?.settings.gridSize ?? DEFAULT_GRID;
+    const MAX_PULL = GRID * 4.5;
+    const GROUND_Y = stageLayout?.settings.groundY ?? DEFAULT_GROUND_Y;
+    const PLAYER_RADIUS = 8;
+    const PLAYER_BORDER = 3;
+    const STAGE_CLEAR_REWARD = 5;
+    const PLAYER_SIZE = 44;
+    const DEFAULT_PLAYER_X = Math.round(MAP_W / 2 - PLAYER_SIZE / 2);
 
     const prefs = shell.getPreferences();
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
     let isLoadingFromSave = false;
     const gameExitBtn = document.getElementById('game-exit-btn');
+    let bestScoreHud = document.getElementById('best-score-hud');
+    if (!bestScoreHud) {
+      bestScoreHud = document.createElement('div');
+      bestScoreHud.id = 'best-score-hud';
+      bestScoreHud.className = 'best-score-hud';
+      bestScoreHud.hidden = true;
+      bestScoreHud.setAttribute('aria-live', 'polite');
+      document.body.appendChild(bestScoreHud);
+    }
 
     const app = new PIXI.Application({
       view: canvas,
@@ -71,13 +161,15 @@
       mode: gameMode,
       stage: gameStage,
       seed: gameSeed,
+      stageLayout,
       collectedCreditIds: initialCollectedCreditIds,
+      collectedStarIds: initialSave?.map?.collectedStarIds ?? [],
       collectedPortalIds: initialSave?.map?.collectedPortalIds ?? [],
     });
 
-    stageStarTotal = gameMode === 'stage' ? map.portals.length : 0;
+    stageStarTotal = gameMode === 'stage' ? (map.stars ?? map.portals ?? []).length : 0;
     stageStarsCollected = gameMode === 'stage'
-      ? map.portals.filter((portal) => portal.collected).length
+      ? (map.stars ?? map.portals ?? []).filter((star) => star.collected).length
       : 0;
 
     if (initialSave?.map?.nextSpawnY != null) {
@@ -89,7 +181,8 @@
     let cameraLeft = 0;
     let cameraTop = 0;
     let score = 0;
-    let creditBalance = numberOr(initialSave?.credits, numberOr(storageReadSave()?.credits, 0));
+    let bestScore = 0;
+    let creditBalance = readCreditBalance();
     let player = null;
     let scoreText = null;
     let multiplierText = null;
@@ -98,6 +191,7 @@
     let stageStarText = null;
     let autosaveTimer = null;
     let stageCleared = false;
+    let saveQueue = Promise.resolve();
 
     function getCameraZoom() {
       if (!IS_TOUCH_DEVICE) return 1;
@@ -121,6 +215,16 @@
         multiplierText.x = CANVAS_W / 2;
         multiplierText.y = scoreText ? scoreText.y + scoreText.height - 2 : 56;
       }
+    }
+
+    function updateBestScoreHud() {
+      if (!bestScoreHud) return;
+      if (gameMode !== 'infinite') {
+        bestScoreHud.hidden = true;
+        return;
+      }
+      bestScoreHud.hidden = false;
+      bestScoreHud.textContent = `최고기록: ${bestScore}`;
     }
 
     function syncCamera(immediate = false) {
@@ -156,11 +260,13 @@
         player.ctx.stickSurfaces = activeMap.stickSurfaces;
         player.ctx.windmills = activeMap.windmills;
         player.ctx.credits = activeMap.credits;
-        player.ctx.portals = activeMap.portals;
+        player.ctx.stars = activeMap.stars ?? activeMap.portals;
+        player.ctx.portals = activeMap.portals ?? activeMap.stars;
       }
     }
 
     function updateMenuCreditBalance() {
+      writeCreditBalance(creditBalance);
       shell.setCreditBalance(creditBalance);
     }
 
@@ -205,6 +311,11 @@
         if (multiplierText) {
           multiplierText.text = `x${getCreditValue(score)}`;
         }
+        if (gameMode === 'infinite' && score > bestScore) {
+          bestScore = score;
+          writeInfiniteBestScore(bestScore);
+          updateBestScoreHud();
+        }
         layoutScoreHud();
       }
     }
@@ -222,7 +333,7 @@
       }
 
       stageStarText.visible = true;
-      stageStarText.text = `★ : ${Math.min(stageStarsCollected, stageStarTotal)}/${stageStarTotal}`;
+      stageStarText.text = `별: ${Math.min(stageStarsCollected, stageStarTotal)}/${stageStarTotal}`;
     }
 
     function followCamera() {
@@ -277,7 +388,7 @@
 
     function autosaveIfNeeded(reason) {
       if (autoSaveEnabled && !isLoadingFromSave) {
-        saveGame(reason);
+        void enqueueSave(reason);
       }
     }
 
@@ -288,15 +399,25 @@
       }
     }
 
-    function completeStage() {
+    function enqueueSave(reason = '수동 저장 완료') {
+      const next = saveQueue.then(
+        () => saveGame(reason),
+        () => saveGame(reason)
+      );
+      saveQueue = next.catch(() => false);
+      return next;
+    }
+
+    async function completeStage() {
       if (stageCleared) return;
       stageCleared = true;
       pauseAutosaveTimer();
+      await unlockStage(gameStage);
       creditBalance += STAGE_CLEAR_REWARD;
       updateMenuCreditBalance();
       updateCreditText();
-      saveGame(`스테이지 ${gameStage} 클리어 보상`);
-      setStatus(`스테이지 ${gameStage}를 클리어했습니다. 보상 +${STAGE_CLEAR_REWARD} 크레딧.`);
+      await enqueueSave(`스테이지 ${gameStage} 클리어 보상`);
+      setStatus(`스테이지 ${gameStage}를 클리어했습니다. 보상 +${STAGE_CLEAR_REWARD} 크레딧`);
       audioManager?.playStartSwoosh?.();
       shell.showStageClearPopup?.({
         stage: gameStage,
@@ -305,8 +426,9 @@
       });
     }
 
-    function quitToMenu() {
+    async function quitToMenu() {
       shell.hideStageClearPopup?.();
+      await enqueueSave('게임 종료 전 저장');
       writeStartMode('menu');
       window.location.reload();
     }
@@ -332,14 +454,14 @@
       };
     }
 
-    function saveGame(reason = '수동 저장 완료') {
+    async function saveGame(reason = '수동 저장 완료') {
       try {
         const snapshot = getSaveSnapshot();
         if (!snapshot) {
           setStatus('저장할 게임 상태가 없습니다.');
           return false;
         }
-        storageWriteSave(snapshot);
+        await storageWriteSave(snapshot);
         shell.updateMenuState(snapshot);
         updateMenuCreditBalance();
         setStatus(`${reason} · ${formatTime(snapshot.savedAt)}`);
@@ -364,6 +486,14 @@
     }
 
     const initialSaveForGame = initialSave ?? null;
+    const storedBestScore = gameMode === 'infinite' ? readInfiniteBestScore() : 0;
+    bestScore = gameMode === 'infinite'
+      ? Math.max(storedBestScore, numberOr(initialSaveForGame?.score, 0))
+      : 0;
+    if (gameMode === 'infinite' && bestScore > storedBestScore) {
+      writeInfiniteBestScore(bestScore);
+    }
+    updateBestScoreHud();
 
     player = new Square(
       {
@@ -374,6 +504,7 @@
         stickSurfaces: [],
         windmills: [],
         credits: [],
+        stars: [],
         portals: [],
         onCreditCollected: null,
         onImpact: null,
@@ -383,7 +514,7 @@
         PLAYER_RADIUS,
         PLAYER_BORDER,
       },
-      initialSaveForGame?.player?.x ?? MAP_W / 2,
+      initialSaveForGame?.player?.x ?? DEFAULT_PLAYER_X,
       initialSaveForGame?.player?.y ?? GROUND_Y - 44
     );
 
@@ -397,6 +528,7 @@
       updateMenuCreditBalance();
       updateCreditText();
       audioManager?.playCredit?.(creditValue);
+      void enqueueSave('크레딧 획득 저장');
     };
     player.ctx.onImpact = (impact) => {
       audioManager?.playImpact(impact);
@@ -405,8 +537,10 @@
     world.addChild(player.ctx.dotLayer);
 
     if (initialSaveForGame?.player) {
-      player.gfx.x = numberOr(initialSaveForGame.player.x, MAP_W / 2);
+      player.gfx.x = numberOr(initialSaveForGame.player.x, DEFAULT_PLAYER_X);
       player.gfx.y = numberOr(initialSaveForGame.player.y, GROUND_Y - 44);
+    } else {
+      player.gfx.x = DEFAULT_PLAYER_X;
     }
 
     scoreText = new PIXI.Text('0', {
@@ -426,7 +560,6 @@
     });
     multiplierText.anchor.set(0.5, 0);
     uiLayer.addChild(multiplierText);
-
     modeText = new PIXI.Text(gameMode === 'stage' ? `스테이지 ${gameStage}` : '무한 모드', {
       fontFamily: 'Courier New',
       fontSize: 16,
@@ -449,7 +582,7 @@
     creditText.y = 62;
     uiLayer.addChild(creditText);
 
-    stageStarText = new PIXI.Text('★ : 0/3', {
+    stageStarText = new PIXI.Text('별: 0/3', {
       fontFamily: 'Courier New',
       fontSize: 20,
       fill: 0x1a1a1a,
@@ -494,12 +627,12 @@
     shell.setActions({
       onSetGridVisible: (visible) => {
         setGridVisible(visible);
-        setStatus(visible ? '격자선을 켰습니다.' : '격자선을 껐습니다.');
+        setStatus(visible ? '그리드를 켰습니다.' : '그리드를 껐습니다.');
       },
       onToggleGrid: () => {
         const nextVisible = !gridVisible;
         setGridVisible(nextVisible);
-        setStatus(nextVisible ? '격자선을 켰습니다.' : '격자선을 껐습니다.');
+        setStatus(nextVisible ? '그리드를 켰습니다.' : '그리드를 껐습니다.');
       },
       onQuit: () => {
         quitToMenu();
@@ -516,19 +649,19 @@
         if (windmill.chunk && !windmill.chunk.container.visible) continue;
         windmill.blades.rotation += windmill.speed;
       }
-      for (const portal of map.portals || []) {
-        if (!portal || portal.collected) continue;
-        if (portal.ringLayer) {
-          const pulse = 1 + Math.sin(now * (portal.pulseSpeed ?? 2) + (portal.phase ?? 0)) * (portal.pulseAmplitude ?? 0.05);
-          portal.ringLayer.scale.set(pulse);
+      for (const star of map.stars || map.portals || []) {
+        if (!star || star.collected) continue;
+        if (star.ringLayer) {
+          const pulse = 1 + Math.sin(now * (star.pulseSpeed ?? 2) + (star.phase ?? 0)) * (star.pulseAmplitude ?? 0.05);
+          star.ringLayer.scale.set(pulse);
         }
       }
       player.update();
       if (gameMode === 'stage') {
-        for (const portal of map.portals || []) {
-          if (!portal || portal.collected) continue;
-          if (!rectIntersectsRect(player.gfx, portal)) continue;
-          if (collectStageStar(portal)) break;
+        for (const star of map.stars || map.portals || []) {
+          if (!star || star.collected) continue;
+          if (!rectIntersectsRect(player.gfx, star)) continue;
+          if (collectStageStar(star)) break;
         }
       }
       updateScore();
@@ -543,19 +676,19 @@
     }
 
     window.addEventListener('pagehide', () => {
-      autosaveIfNeeded('자동 저장');
+      autosaveIfNeeded('Auto save');
     });
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        autosaveIfNeeded('자동 저장');
+        autosaveIfNeeded('Auto save');
       }
     });
 
     function restartAutosaveTimer() {
       pauseAutosaveTimer();
       autosaveTimer = window.setInterval(() => {
-        autosaveIfNeeded('자동 저장');
+        autosaveIfNeeded('Auto save');
       }, AUTOSAVE_INTERVAL_MS);
     }
 
@@ -576,3 +709,10 @@
 
   window.UpUpUpRuntime = { startGame };
 })();
+
+
+
+
+
+
+
