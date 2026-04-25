@@ -8,6 +8,8 @@
   const SAVE_TOMBSTONE_KEY = 'upupup.io.saveDeleted.v1';
   const CREDIT_BALANCE_KEY = 'upupup.io.creditBalance.v1';
   const INFINITE_BEST_SCORE_KEY = 'upupup.io.infiniteBestScore.v1';
+  const INFINITE_BEST_RECORD_KEY = 'upupup.io.infiniteBestRecord.v1';
+  const LEADERBOARD_KEY = 'upupup.io.leaderboard.v1';
   const STAGE_PROGRESS_KEY = 'upupup.io.stageProgress.v1';
   const STAGE_EDITOR_DRAFT_KEY = 'upupup.stage-editor.draft.v1';
   const STAGE_EDITOR_STAGE_PREFIX = 'upupup.stage-editor.stage.v1.';
@@ -17,7 +19,9 @@
   const SECURE_STORE_NAME = 'vault';
   const SECURE_KEY_RECORD = 'save-key';
   const SECURE_SAVE_RECORD = 'save-state';
+  const SECURE_INFINITE_BEST_RECORD = 'infinite-best-record';
   const SECURE_STAGE_PROGRESS_RECORD = 'stage-progress';
+  const LEADERBOARD_MAX_ENTRIES = 10;
 
   let secureDb = null;
   let secureDbPromise = null;
@@ -26,6 +30,7 @@
   let secureStorageReady = false;
   let secureStorageSupported = false;
   let cachedSave = null;
+  let cachedInfiniteBestRecord = { score: 0, elapsedMs: null, savedAt: 0 };
   let cachedStageProgress = { maxUnlockedStage: 1 };
 
   function getViewportSize() {
@@ -145,6 +150,24 @@
     });
   }
 
+  function formatDuration(durationMs) {
+    if (!Number.isFinite(durationMs)) {
+      return '--:--';
+    }
+
+    const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+    const seconds = totalSeconds % 60;
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const minutes = totalMinutes % 60;
+    const hours = Math.floor(totalMinutes / 60);
+
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
   function numberOr(value, fallback) {
     return Number.isFinite(value) ? value : fallback;
   }
@@ -155,6 +178,164 @@
 
   function normalizeCreditBalance(value) {
     return Math.max(0, Math.floor(Number(value) || 0));
+  }
+
+  function normalizeElapsedMs(value) {
+    if (!Number.isFinite(value)) return null;
+    return Math.max(0, Math.floor(value));
+  }
+
+  function normalizeInfiniteBestRecord(raw) {
+    if (raw == null) {
+      return { score: 0, elapsedMs: null, savedAt: 0 };
+    }
+
+    if (Number.isFinite(raw)) {
+      return {
+        score: normalizeScore(raw),
+        elapsedMs: null,
+        savedAt: 0,
+      };
+    }
+
+    if (typeof raw !== 'object') {
+      return { score: 0, elapsedMs: null, savedAt: 0 };
+    }
+
+    return {
+      score: normalizeScore(raw.score),
+      elapsedMs: normalizeElapsedMs(raw.elapsedMs),
+      savedAt: Number.isFinite(raw.savedAt) ? Math.max(0, Math.floor(raw.savedAt)) : 0,
+    };
+  }
+
+  function normalizeLeaderboardNickname(value) {
+    return String(value ?? '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .slice(0, 16);
+  }
+
+  function normalizeLeaderboardEntry(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+
+    const nickname = normalizeLeaderboardNickname(raw.nickname);
+    const passwordHash = String(raw.passwordHash ?? '');
+    if (!nickname || !passwordHash) return null;
+
+    return {
+      nickname,
+      passwordHash,
+      score: normalizeScore(raw.score),
+      elapsedMs: normalizeElapsedMs(raw.elapsedMs),
+      savedAt: Number.isFinite(raw.savedAt) ? Math.max(0, Math.floor(raw.savedAt)) : 0,
+    };
+  }
+
+  function isLeaderboardEntryBetter(candidate, current) {
+    if (!current) return true;
+    if (candidate.score !== current.score) {
+      return candidate.score > current.score;
+    }
+
+    const candidateElapsed = Number.isFinite(candidate.elapsedMs) ? candidate.elapsedMs : Number.POSITIVE_INFINITY;
+    const currentElapsed = Number.isFinite(current.elapsedMs) ? current.elapsedMs : Number.POSITIVE_INFINITY;
+    if (candidateElapsed !== currentElapsed) {
+      return candidateElapsed < currentElapsed;
+    }
+
+    return candidate.savedAt > current.savedAt;
+  }
+
+  function compareLeaderboardEntries(a, b) {
+    if (a.score !== b.score) {
+      return b.score - a.score;
+    }
+
+    const aElapsed = Number.isFinite(a.elapsedMs) ? a.elapsedMs : Number.POSITIVE_INFINITY;
+    const bElapsed = Number.isFinite(b.elapsedMs) ? b.elapsedMs : Number.POSITIVE_INFINITY;
+    if (aElapsed !== bElapsed) {
+      return aElapsed - bElapsed;
+    }
+
+    return b.savedAt - a.savedAt;
+  }
+
+  function readLeaderboardEntries() {
+    const raw = readJSONStorage(LEADERBOARD_KEY);
+    const entries = Array.isArray(raw)
+      ? raw.map(normalizeLeaderboardEntry).filter(Boolean)
+      : [];
+    return entries.sort(compareLeaderboardEntries).slice(0, LEADERBOARD_MAX_ENTRIES);
+  }
+
+  function writeLeaderboardEntries(entries) {
+    try {
+      const normalized = Array.isArray(entries)
+        ? entries.map(normalizeLeaderboardEntry).filter(Boolean).sort(compareLeaderboardEntries).slice(0, LEADERBOARD_MAX_ENTRIES)
+        : [];
+      writeJSONStorage(LEADERBOARD_KEY, normalized);
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  function submitLeaderboardEntry({
+    nickname,
+    password,
+    score,
+    elapsedMs = null,
+    savedAt = Date.now(),
+  } = {}) {
+    const cleanNickname = normalizeLeaderboardNickname(nickname);
+    const cleanPassword = String(password ?? '').trim();
+    const normalizedScore = normalizeScore(score);
+
+    if (!cleanNickname || !cleanPassword) {
+      return { ok: false, error: '닉네임과 비밀번호를 입력하세요.' };
+    }
+    if (normalizedScore <= 0) {
+      return { ok: false, error: '등록할 점수가 없습니다.' };
+    }
+
+    const candidate = {
+      nickname: cleanNickname,
+      passwordHash: String(fnv1a(cleanPassword)),
+      score: normalizedScore,
+      elapsedMs: normalizeElapsedMs(elapsedMs),
+      savedAt: Number.isFinite(savedAt) ? Math.max(0, Math.floor(savedAt)) : Date.now(),
+    };
+
+    const entries = readLeaderboardEntries();
+    const existingIndex = entries.findIndex((entry) => entry.nickname === cleanNickname);
+    let nextEntry = candidate;
+
+    if (existingIndex >= 0) {
+      const current = entries[existingIndex];
+      if (current.passwordHash !== candidate.passwordHash) {
+        return { ok: false, error: '비밀번호가 맞지 않습니다.' };
+      }
+
+      if (isLeaderboardEntryBetter(candidate, current)) {
+        nextEntry = { ...current, ...candidate };
+        entries[existingIndex] = nextEntry;
+      } else {
+        nextEntry = current;
+      }
+    } else {
+      entries.push(candidate);
+    }
+
+    if (!writeLeaderboardEntries(entries)) {
+      return { ok: false, error: '순위표 저장에 실패했습니다.' };
+    }
+
+    return {
+      ok: true,
+      entry: nextEntry,
+      updated: existingIndex >= 0,
+    };
   }
 
   function writeStartMode(mode) {
@@ -237,6 +418,9 @@
       map,
       score: Math.max(0, Math.floor(Number(raw.score) || 0)),
       credits: Math.max(0, Math.floor(Number(raw.credits) || 0)),
+      run: {
+        elapsedMs: normalizeElapsedMs(raw.run?.elapsedMs) ?? 0,
+      },
     };
   }
 
@@ -429,6 +613,18 @@
     localStorage.setItem(SAVE_KEY, encodeSave(data));
   }
 
+  function readLegacyInfiniteBestRecord() {
+    try {
+      const rawRecord = readJSONStorage(INFINITE_BEST_RECORD_KEY);
+      if (rawRecord != null) {
+        return normalizeInfiniteBestRecord(rawRecord);
+      }
+      return normalizeInfiniteBestRecord(readJSONStorage(INFINITE_BEST_SCORE_KEY));
+    } catch {
+      return { score: 0, elapsedMs: null, savedAt: 0 };
+    }
+  }
+
   function readLegacyStageProgress() {
     const progress = readJSONStorage(STAGE_PROGRESS_KEY);
     return normalizeStageProgressData(progress);
@@ -455,6 +651,7 @@
     secureStorageSupported = Boolean(window.indexedDB && window.crypto?.subtle);
     if (!secureStorageSupported) {
       cachedSave = deepFreeze(normalizeSaveData(readLegacySave()));
+      cachedInfiniteBestRecord = deepFreeze(normalizeInfiniteBestRecord(readLegacyInfiniteBestRecord()));
       cachedStageProgress = deepFreeze(normalizeStageProgressData(readLegacyStageProgress()));
       secureStorageReady = true;
       return;
@@ -462,18 +659,22 @@
 
     try {
       await getSecureKey();
-      const [saveRecord, progressRecord] = await Promise.all([
+      const [saveRecord, bestRecord, progressRecord] = await Promise.all([
         readSecureRecord(SECURE_SAVE_RECORD),
+        readSecureRecord(SECURE_INFINITE_BEST_RECORD),
         readSecureRecord(SECURE_STAGE_PROGRESS_RECORD),
       ]);
 
       const decodedSave = await decryptRecord(SECURE_SAVE_RECORD, saveRecord);
+      const decodedBestRecord = await decryptRecord(SECURE_INFINITE_BEST_RECORD, bestRecord);
       const decodedProgress = await decryptRecord(SECURE_STAGE_PROGRESS_RECORD, progressRecord);
       const legacySave = normalizeSaveData(readLegacySave());
+      const legacyBestRecord = normalizeInfiniteBestRecord(readLegacyInfiniteBestRecord());
       const legacyProgress = normalizeStageProgressData(readLegacyStageProgress());
       cachedSave = readJSONStorage(SAVE_TOMBSTONE_KEY)
         ? null
         : deepFreeze(normalizeSaveData(decodedSave) ?? legacySave);
+      cachedInfiniteBestRecord = deepFreeze(decodedBestRecord ? normalizeInfiniteBestRecord(decodedBestRecord) : legacyBestRecord);
       cachedStageProgress = deepFreeze(normalizeStageProgressData(decodedProgress) ?? legacyProgress);
 
       if (!saveRecord) {
@@ -482,6 +683,12 @@
           const record = await encryptRecord(SECURE_SAVE_RECORD, legacySave);
           await writeSecureRecord(SECURE_SAVE_RECORD, record);
         }
+      }
+
+      if (!bestRecord) {
+        cachedInfiniteBestRecord = deepFreeze(legacyBestRecord);
+        const record = await encryptRecord(SECURE_INFINITE_BEST_RECORD, legacyBestRecord);
+        await writeSecureRecord(SECURE_INFINITE_BEST_RECORD, record);
       }
 
       if (!progressRecord) {
@@ -496,6 +703,7 @@
       secureKey = null;
       secureKeyPromise = null;
       cachedSave = deepFreeze(normalizeSaveData(readLegacySave()));
+      cachedInfiniteBestRecord = deepFreeze(normalizeInfiniteBestRecord(readLegacyInfiniteBestRecord()));
       cachedStageProgress = deepFreeze(normalizeStageProgressData(readLegacyStageProgress()));
     } finally {
       secureStorageReady = true;
@@ -568,7 +776,7 @@
       writeLegacyStageProgress(normalized);
       cachedStageProgress = deepFreeze(normalized);
       return true;
-      } catch {
+    } catch {
       if (secureStorageSupported) {
         try {
           cachedStageProgress = deepFreeze(normalized);
@@ -589,6 +797,43 @@
 
   function getUnlockedStageLimit() {
     return readStageProgress().maxUnlockedStage;
+  }
+
+  function readInfiniteBestRecord() {
+    if (secureStorageReady && cachedInfiniteBestRecord) {
+      return cachedInfiniteBestRecord;
+    }
+    return normalizeInfiniteBestRecord(readLegacyInfiniteBestRecord());
+  }
+
+  async function writeInfiniteBestRecord(record) {
+    const normalized = normalizeInfiniteBestRecord(record);
+    if (secureStorageSupported) {
+      try {
+        const encrypted = await encryptRecord(SECURE_INFINITE_BEST_RECORD, normalized);
+        await writeSecureRecord(SECURE_INFINITE_BEST_RECORD, encrypted);
+      } catch {
+        // Fall back to the localStorage backup below.
+      }
+    }
+
+    try {
+      writeJSONStorage(INFINITE_BEST_RECORD_KEY, normalized);
+      writeJSONStorage(INFINITE_BEST_SCORE_KEY, normalized.score);
+      cachedInfiniteBestRecord = deepFreeze(normalized);
+      return true;
+    } catch {
+      if (secureStorageSupported) {
+        try {
+          cachedInfiniteBestRecord = deepFreeze(normalized);
+          writeJSONStorage(INFINITE_BEST_SCORE_KEY, normalized.score);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    }
   }
 
   function getStageEditorStageKey(stageNumber) {
@@ -620,20 +865,15 @@
   }
 
   function readInfiniteBestScore() {
-    try {
-      return normalizeScore(readJSONStorage(INFINITE_BEST_SCORE_KEY));
-    } catch {
-      return 0;
-    }
+    return readInfiniteBestRecord().score;
   }
 
   function writeInfiniteBestScore(score) {
-    try {
-      writeJSONStorage(INFINITE_BEST_SCORE_KEY, normalizeScore(score));
-    } catch {
-      return false;
-    }
-    return true;
+    return writeInfiniteBestRecord({
+      score: normalizeScore(score),
+      elapsedMs: readInfiniteBestRecord().elapsedMs,
+      savedAt: Date.now(),
+    });
   }
 
   function readStageEditorStage(stageNumber) {
@@ -671,6 +911,7 @@
     readPrefs,
     writePrefs,
     formatTime,
+    formatDuration,
     numberOr,
     writeStartMode,
     readCreditBalance,
@@ -678,8 +919,14 @@
     storageReadSave,
     storageWriteSave,
     storageDeleteSave,
+    readInfiniteBestRecord,
     readInfiniteBestScore,
+    writeInfiniteBestRecord,
     writeInfiniteBestScore,
+    LEADERBOARD_MAX_ENTRIES,
+    readLeaderboardEntries,
+    writeLeaderboardEntries,
+    submitLeaderboardEntry,
     STAGE_PROGRESS_KEY,
     STAGE_EDITOR_DRAFT_KEY,
     STAGE_EDITOR_STAGE_PREFIX,

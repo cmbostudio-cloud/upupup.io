@@ -1,8 +1,15 @@
 (() => {
   const {
     formatTime,
+    formatDuration,
     numberOr,
+    readJSONStorage,
     readPrefs,
+    readInfiniteBestRecord,
+    readLeaderboardEntries,
+    submitLeaderboardEntry,
+    writeJSONStorage,
+    LEADERBOARD_MAX_ENTRIES,
     writePrefs,
     storageReadSave,
     hasStageEditorStage,
@@ -24,6 +31,18 @@
     const saveStatus = document.getElementById('save-status');
     const gameTitle = gamePanel?.querySelector('.menu-title');
     const menuActions = gamePanel?.querySelector('.menu-actions');
+    const bestScoreHud = (() => {
+      let hud = document.getElementById('best-score-hud');
+      if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'best-score-hud';
+        hud.className = 'best-score-hud';
+        hud.hidden = true;
+        hud.setAttribute('aria-live', 'polite');
+        document.body.appendChild(hud);
+      }
+      return hud;
+    })();
     const stageClearPopup = document.createElement('div');
     stageClearPopup.className = 'stage-clear-popup';
     stageClearPopup.hidden = true;
@@ -65,6 +84,7 @@
     let audioVolume = prefs.audioVolume;
     let activeTab = 'game';
     let gameView = 'modes';
+    let infiniteBestRecord = readInfiniteBestRecord();
 
     const stageCount = 50;
 
@@ -118,6 +138,151 @@
     infiniteAbandonBtn.textContent = '[중도 포기]';
     infiniteSelectPanel.appendChild(infiniteAbandonBtn);
 
+    const leaderboardPanel = document.createElement('section');
+    leaderboardPanel.id = 'leaderboard-panel';
+    leaderboardPanel.className = 'leaderboard-panel';
+    leaderboardPanel.hidden = true;
+    leaderboardPanel.innerHTML = `
+      <div class="leaderboard-head">
+        <span class="leaderboard-kicker">순위표</span>
+        <h4 class="leaderboard-title">무한 모드 기록</h4>
+      </div>
+      <form id="leaderboard-form" class="leaderboard-form" autocomplete="off">
+        <label class="leaderboard-field" for="leaderboard-nickname">
+          <span class="leaderboard-field-label">닉네임</span>
+          <input
+            id="leaderboard-nickname"
+            class="leaderboard-input"
+            type="text"
+            maxlength="16"
+            autocomplete="nickname"
+            spellcheck="false"
+            placeholder="이름을 입력"
+          >
+        </label>
+        <label class="leaderboard-field" for="leaderboard-password">
+          <span class="leaderboard-field-label">비밀번호</span>
+          <input
+            id="leaderboard-password"
+            class="leaderboard-input"
+            type="password"
+            maxlength="32"
+            autocomplete="new-password"
+            placeholder="비밀번호를 입력"
+          >
+        </label>
+        <button id="leaderboard-submit-btn" class="leaderboard-submit-btn" type="submit">
+          등록
+        </button>
+      </form>
+      <p id="leaderboard-message" class="leaderboard-message" aria-live="polite"></p>
+      <ol id="leaderboard-list" class="leaderboard-list" aria-label="무한 모드 순위표"></ol>
+    `;
+
+    function renderInfiniteBestHud() {
+      const record = infiniteBestRecord ?? readInfiniteBestRecord();
+      const score = numberOr(record?.score, 0);
+      const elapsedText = formatDuration(record?.elapsedMs);
+      bestScoreHud.textContent = `최고점수: ${score}\n기록시간: ${elapsedText}`;
+    }
+
+    const leaderboardForm = leaderboardPanel.querySelector('#leaderboard-form');
+    const leaderboardNicknameInput = leaderboardPanel.querySelector('#leaderboard-nickname');
+    const leaderboardPasswordInput = leaderboardPanel.querySelector('#leaderboard-password');
+    const leaderboardSubmitBtn = leaderboardPanel.querySelector('#leaderboard-submit-btn');
+    const leaderboardMessage = leaderboardPanel.querySelector('#leaderboard-message');
+    const leaderboardList = leaderboardPanel.querySelector('#leaderboard-list');
+    const leaderboardLastNicknameKey = 'upupup.io.leaderboard.lastNickname.v1';
+
+    function setLeaderboardMessage(message) {
+      if (leaderboardMessage) {
+        leaderboardMessage.textContent = message;
+      }
+    }
+
+    function readStoredLeaderboardNickname() {
+      const stored = readJSONStorage(leaderboardLastNicknameKey);
+      return typeof stored === 'string' ? stored : '';
+    }
+
+    function storeLeaderboardNickname(nickname) {
+      try {
+        writeJSONStorage(leaderboardLastNicknameKey, String(nickname || ''));
+      } catch {
+        // Ignore cache failures.
+      }
+    }
+
+    function renderLeaderboard() {
+      if (!leaderboardList) return;
+
+      const entries = readLeaderboardEntries();
+      leaderboardList.innerHTML = '';
+
+      if (!entries.length) {
+        const emptyItem = document.createElement('li');
+        emptyItem.className = 'leaderboard-empty';
+        emptyItem.textContent = '아직 등록된 순위가 없습니다.';
+        leaderboardList.appendChild(emptyItem);
+        return;
+      }
+
+      for (const [index, entry] of entries.slice(0, LEADERBOARD_MAX_ENTRIES).entries()) {
+        const row = document.createElement('li');
+        row.className = 'leaderboard-item';
+
+        const rank = document.createElement('span');
+        rank.className = 'leaderboard-rank';
+        rank.textContent = String(index + 1).padStart(2, '0');
+
+        const name = document.createElement('span');
+        name.className = 'leaderboard-name';
+        name.textContent = entry.nickname;
+
+        const meta = document.createElement('span');
+        meta.className = 'leaderboard-meta';
+        meta.textContent = `${numberOr(entry.score, 0)} · ${formatDuration(entry.elapsedMs)}`;
+
+        row.append(rank, name, meta);
+        leaderboardList.appendChild(row);
+      }
+    }
+
+    function syncLeaderboardDefaults() {
+      if (leaderboardNicknameInput && !leaderboardNicknameInput.value) {
+        leaderboardNicknameInput.value = readStoredLeaderboardNickname();
+      }
+      if (leaderboardPasswordInput) {
+        leaderboardPasswordInput.value = '';
+      }
+    }
+
+    function submitLeaderboardFromForm(event) {
+      event.preventDefault();
+
+      const nickname = leaderboardNicknameInput?.value ?? '';
+      const password = leaderboardPasswordInput?.value ?? '';
+      const record = readInfiniteBestRecord();
+      const result = submitLeaderboardEntry({
+        nickname,
+        password,
+        score: record?.score ?? 0,
+        elapsedMs: record?.elapsedMs ?? null,
+      });
+
+      if (!result.ok) {
+        setLeaderboardMessage(result.error || '등록에 실패했습니다.');
+        return;
+      }
+
+      storeLeaderboardNickname(nickname);
+      if (leaderboardPasswordInput) {
+        leaderboardPasswordInput.value = '';
+      }
+      setLeaderboardMessage(result.updated ? '순위표를 갱신했습니다.' : '순위표에 등록했습니다.');
+      renderLeaderboard();
+    }
+
     if (menuContinueNote) {
       menuContinueNote.insertAdjacentElement('beforebegin', stageSelectPanel);
       menuContinueNote.insertAdjacentElement('beforebegin', infiniteSelectPanel);
@@ -125,6 +290,7 @@
       gamePanel.appendChild(stageSelectPanel);
       gamePanel.appendChild(infiniteSelectPanel);
     }
+    infiniteAbandonBtn.insertAdjacentElement('afterend', leaderboardPanel);
     document.body.appendChild(stageClearPopup);
     document.body.appendChild(abandonWarningPopup);
 
@@ -273,6 +439,22 @@
       }
       if (infiniteSelectPanel) {
         infiniteSelectPanel.hidden = !showInfinite;
+      }
+
+      if (showInfinite) {
+        infiniteBestRecord = readInfiniteBestRecord();
+        renderInfiniteBestHud();
+        syncLeaderboardDefaults();
+        renderLeaderboard();
+        bestScoreHud.classList.remove('is-game-hud');
+        bestScoreHud.classList.add('is-menu-hud');
+        bestScoreHud.hidden = false;
+        leaderboardPanel.hidden = false;
+      } else {
+        bestScoreHud.classList.remove('is-menu-hud', 'is-game-hud');
+        bestScoreHud.hidden = true;
+        leaderboardPanel.hidden = true;
+        setLeaderboardMessage('');
       }
     }
 
@@ -427,6 +609,8 @@
           onConfirm: () => actions.onAbandonInfinite?.(),
         });
       });
+
+      leaderboardForm?.addEventListener('submit', submitLeaderboardFromForm);
 
       stageGrid?.addEventListener('click', (event) => {
         const button = event.target.closest('button[data-stage-number]');

@@ -7,12 +7,13 @@
     createSeed,
     numberOr,
     formatTime,
+    formatDuration,
     AUTOSAVE_INTERVAL_MS,
     SAVE_VERSION,
     readCreditBalance,
     writeCreditBalance,
-    readInfiniteBestScore,
-    writeInfiniteBestScore,
+    readInfiniteBestRecord,
+    writeInfiniteBestRecord,
     storageReadSave,
     storageWriteSave,
     writeStartMode,
@@ -121,6 +122,10 @@
     let gridVisible = prefs.gridVisible;
     let isLoadingFromSave = false;
     const gameExitBtn = document.getElementById('game-exit-btn');
+    if (gameExitBtn) {
+      gameExitBtn.textContent = '× 종료';
+      gameExitBtn.setAttribute('aria-label', '게임 종료');
+    }
     let bestScoreHud = document.getElementById('best-score-hud');
     if (!bestScoreHud) {
       bestScoreHud = document.createElement('div');
@@ -130,6 +135,13 @@
       bestScoreHud.setAttribute('aria-live', 'polite');
       document.body.appendChild(bestScoreHud);
     }
+    let playTimeHud = null;
+    let creditHud = null;
+    let runElapsedBaseMs = 0;
+    let runElapsedSessionMs = 0;
+    let runLastPerfMs = performance.now();
+    let runPaused = false;
+    let bestRecord = { score: 0, elapsedMs: null, savedAt: 0 };
 
     const app = new PIXI.Application({
       view: canvas,
@@ -181,13 +193,11 @@
     let cameraLeft = 0;
     let cameraTop = 0;
     let score = 0;
-    let bestScore = 0;
     let creditBalance = readCreditBalance();
     let player = null;
     let scoreText = null;
     let multiplierText = null;
     let modeText = null;
-    let creditText = null;
     let stageStarText = null;
     let autosaveTimer = null;
     let stageCleared = false;
@@ -209,11 +219,11 @@
     function layoutScoreHud() {
       if (scoreText) {
         scoreText.x = CANVAS_W / 2;
-        scoreText.y = 10;
+        scoreText.y = 8;
       }
       if (multiplierText) {
         multiplierText.x = CANVAS_W / 2;
-        multiplierText.y = scoreText ? scoreText.y + scoreText.height - 2 : 56;
+        multiplierText.y = scoreText ? scoreText.y + scoreText.height - 6 : 48;
       }
     }
 
@@ -224,7 +234,61 @@
         return;
       }
       bestScoreHud.hidden = false;
-      bestScoreHud.textContent = `최고기록: ${bestScore}`;
+      bestScoreHud.classList.remove('is-menu-hud');
+      bestScoreHud.classList.add('is-game-hud');
+      bestScoreHud.textContent = `기록 ${bestRecord.score} · ${formatDuration(bestRecord.elapsedMs)}`;
+    }
+
+    function ensurePlayTimeHud() {
+      if (gameMode !== 'infinite') return;
+      if (!playTimeHud) {
+        playTimeHud = document.getElementById('play-time-hud');
+        if (!playTimeHud) {
+          playTimeHud = document.createElement('div');
+          playTimeHud.id = 'play-time-hud';
+          playTimeHud.className = 'play-time-hud';
+          playTimeHud.hidden = true;
+          playTimeHud.setAttribute('aria-live', 'polite');
+          document.body.appendChild(playTimeHud);
+        }
+      }
+    }
+
+    function ensureCreditHud() {
+      if (!creditHud) {
+        creditHud = document.getElementById('credit-hud');
+        if (!creditHud) {
+          creditHud = document.createElement('div');
+          creditHud.id = 'credit-hud';
+          creditHud.className = 'credit-hud';
+          creditHud.hidden = true;
+          creditHud.setAttribute('aria-live', 'polite');
+          document.body.appendChild(creditHud);
+        }
+      }
+    }
+
+    function syncRunElapsed(now = performance.now()) {
+      if (runPaused) {
+        runLastPerfMs = now;
+        return runElapsedBaseMs + runElapsedSessionMs;
+      }
+
+      const delta = Math.max(0, now - runLastPerfMs);
+      runElapsedSessionMs += delta;
+      runLastPerfMs = now;
+      return runElapsedBaseMs + runElapsedSessionMs;
+    }
+
+    function getRunElapsedMs(now = performance.now()) {
+      return syncRunElapsed(now);
+    }
+
+    function updatePlayTimeHud(now = performance.now()) {
+      if (!playTimeHud || gameMode !== 'infinite') return;
+      const elapsedMs = getRunElapsedMs(now);
+      playTimeHud.hidden = false;
+      playTimeHud.textContent = `시간 ${formatDuration(elapsedMs)}`;
     }
 
     function syncCamera(immediate = false) {
@@ -283,9 +347,6 @@
       if (multiplierText) {
         multiplierText.x = CANVAS_W / 2;
       }
-      if (creditText) {
-        creditText.x = 14;
-      }
       if (modeText) {
         modeText.x = 14;
       }
@@ -311,9 +372,16 @@
         if (multiplierText) {
           multiplierText.text = `x${getCreditValue(score)}`;
         }
-        if (gameMode === 'infinite' && score > bestScore) {
-          bestScore = score;
-          writeInfiniteBestScore(bestScore);
+        if (gameMode === 'infinite' && (
+          score > bestRecord.score ||
+          (bestRecord.score > 0 && score === bestRecord.score && bestRecord.elapsedMs == null)
+        )) {
+          bestRecord = {
+            score,
+            elapsedMs: Math.max(0, Math.floor(getRunElapsedMs())),
+            savedAt: Date.now(),
+          };
+          void writeInfiniteBestRecord(bestRecord);
           updateBestScoreHud();
         }
         layoutScoreHud();
@@ -321,8 +389,10 @@
     }
 
     function updateCreditText() {
-      if (!creditText) return;
-      creditText.text = `크레딧 ${creditBalance}`;
+      ensureCreditHud();
+      if (!creditHud) return;
+      creditHud.hidden = false;
+      creditHud.textContent = `크레딧 ${creditBalance}`;
     }
 
     function updateStageStarText() {
@@ -451,6 +521,9 @@
         map: map.getState(),
         score,
         credits: creditBalance,
+        run: {
+          elapsedMs: gameMode === 'infinite' ? Math.max(0, Math.floor(getRunElapsedMs())) : 0,
+        },
       };
     }
 
@@ -486,14 +559,41 @@
     }
 
     const initialSaveForGame = initialSave ?? null;
-    const storedBestScore = gameMode === 'infinite' ? readInfiniteBestScore() : 0;
-    bestScore = gameMode === 'infinite'
-      ? Math.max(storedBestScore, numberOr(initialSaveForGame?.score, 0))
-      : 0;
-    if (gameMode === 'infinite' && bestScore > storedBestScore) {
-      writeInfiniteBestScore(bestScore);
+    const initialSaveScore = numberOr(initialSaveForGame?.score, 0);
+    const initialSaveElapsedMs = Number.isFinite(initialSaveForGame?.run?.elapsedMs)
+      ? Math.max(0, Math.floor(initialSaveForGame.run.elapsedMs))
+      : null;
+    const storedBestRecord = gameMode === 'infinite'
+      ? readInfiniteBestRecord()
+      : { score: 0, elapsedMs: null, savedAt: 0 };
+    const promoteInitialSave =
+      gameMode === 'infinite' &&
+      initialSaveScore > 0 &&
+      (
+        initialSaveScore > storedBestRecord.score ||
+        (initialSaveScore === storedBestRecord.score &&
+          storedBestRecord.elapsedMs == null &&
+          initialSaveElapsedMs != null)
+      );
+    bestRecord = gameMode === 'infinite'
+      ? (promoteInitialSave
+        ? {
+          score: initialSaveScore,
+          elapsedMs: initialSaveElapsedMs,
+          savedAt: initialSaveForGame?.savedAt ?? Date.now(),
+        }
+        : storedBestRecord)
+      : { score: 0, elapsedMs: null, savedAt: 0 };
+    if (promoteInitialSave) {
+      void writeInfiniteBestRecord(bestRecord);
+    }
+    if (gameMode === 'infinite') {
+      runElapsedBaseMs = initialSaveElapsedMs ?? 0;
+      ensurePlayTimeHud();
+      runLastPerfMs = performance.now();
     }
     updateBestScoreHud();
+    updatePlayTimeHud();
 
     player = new Square(
       {
@@ -560,46 +660,38 @@
     });
     multiplierText.anchor.set(0.5, 0);
     uiLayer.addChild(multiplierText);
-    modeText = new PIXI.Text(gameMode === 'stage' ? `스테이지 ${gameStage}` : '무한 모드', {
-      fontFamily: 'Courier New',
-      fontSize: 16,
-      fill: 0x1a1a1a,
-      fontWeight: '700',
-    });
-    modeText.anchor.set(0, 0);
-    modeText.x = 14;
-    modeText.y = 40;
-    uiLayer.addChild(modeText);
+    if (gameMode === 'stage') {
+      modeText = new PIXI.Text(`스테이지 ${gameStage}`, {
+        fontFamily: 'Courier New',
+        fontSize: 16,
+        fill: 0x1a1a1a,
+        fontWeight: '700',
+      });
+      modeText.anchor.set(0, 0);
+      modeText.x = 14;
+      modeText.y = 40;
+      uiLayer.addChild(modeText);
 
-    creditText = new PIXI.Text('크레딧 0', {
-      fontFamily: 'Courier New',
-      fontSize: 20,
-      fill: 0x1a1a1a,
-      fontWeight: '700',
-    });
-    creditText.anchor.set(0, 0);
-    creditText.x = 14;
-    creditText.y = 62;
-    uiLayer.addChild(creditText);
-
-    stageStarText = new PIXI.Text('별: 0/3', {
-      fontFamily: 'Courier New',
-      fontSize: 20,
-      fill: 0x1a1a1a,
-      fontWeight: '700',
-    });
-    stageStarText.anchor.set(0, 0);
-    stageStarText.x = 14;
-    stageStarText.y = 84;
-    uiLayer.addChild(stageStarText);
-    updateStageStarText();
-    if (gameMode === 'stage' && stageStarTotal > 0 && stageStarsCollected >= stageStarTotal) {
-      completeStage();
+      stageStarText = new PIXI.Text('별: 0/3', {
+        fontFamily: 'Courier New',
+        fontSize: 20,
+        fill: 0x1a1a1a,
+        fontWeight: '700',
+      });
+      stageStarText.anchor.set(0, 0);
+      stageStarText.x = 14;
+      stageStarText.y = 84;
+      uiLayer.addChild(stageStarText);
+      updateStageStarText();
+      if (stageStarTotal > 0 && stageStarsCollected >= stageStarTotal) {
+        completeStage();
+      }
     }
 
     shell.setMenuVisible(false);
     shell.setGridVisible(gridVisible);
     shell.setAutosaveEnabled(autoSaveEnabled);
+    ensureCreditHud();
 
     if (gameExitBtn) {
       gameExitBtn.hidden = false;
@@ -643,7 +735,12 @@
     app.ticker.maxFPS = 60;
     app.ticker.add(() => {
       if (stageCleared) return;
-      const now = performance.now() * 0.001;
+      const nowMs = performance.now();
+      const now = nowMs * 0.001;
+      if (gameMode === 'infinite') {
+        syncRunElapsed(nowMs);
+        updatePlayTimeHud(nowMs);
+      }
       map.updateMovingSticks();
       for (const windmill of map.windmills) {
         if (windmill.chunk && !windmill.chunk.container.visible) continue;
@@ -676,12 +773,23 @@
     }
 
     window.addEventListener('pagehide', () => {
+      if (gameMode === 'infinite') {
+        syncRunElapsed();
+        runPaused = true;
+      }
       autosaveIfNeeded('Auto save');
     });
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
+        if (gameMode === 'infinite') {
+          syncRunElapsed();
+          runPaused = true;
+        }
         autosaveIfNeeded('Auto save');
+      } else if (gameMode === 'infinite') {
+        runPaused = false;
+        runLastPerfMs = performance.now();
       }
     });
 
