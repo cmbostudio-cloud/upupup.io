@@ -3,13 +3,8 @@
     formatTime,
     formatDuration,
     numberOr,
-    readJSONStorage,
     readPrefs,
     readInfiniteBestRecord,
-    readLeaderboardEntries,
-    submitLeaderboardEntry,
-    writeJSONStorage,
-    LEADERBOARD_MAX_ENTRIES,
     writePrefs,
     storageReadSave,
     hasStageEditorStage,
@@ -43,14 +38,15 @@
       }
       return hud;
     })();
+
     const stageClearPopup = document.createElement('div');
     stageClearPopup.className = 'stage-clear-popup';
     stageClearPopup.hidden = true;
     stageClearPopup.innerHTML = `
       <div class="stage-clear-panel" role="dialog" aria-modal="true" aria-labelledby="stage-clear-title" aria-describedby="stage-clear-desc">
-        <span class="stage-clear-kicker">클리어</span>
+        <span class="stage-clear-kicker">CLEAR</span>
         <h2 id="stage-clear-title" class="stage-clear-title">스테이지 클리어</h2>
-        <p id="stage-clear-desc" class="stage-clear-desc">포탈을 통과해 스테이지를 완료했습니다.</p>
+        <p id="stage-clear-desc" class="stage-clear-desc">별을 모두 모아 스테이지를 완료했습니다.</p>
         <div class="stage-clear-reward" aria-live="polite">
           <span class="stage-clear-reward-label">보상</span>
           <span id="stage-clear-reward-value" class="stage-clear-reward-value">+5 크레딧</span>
@@ -65,15 +61,11 @@
     abandonWarningPopup.innerHTML = `
       <div class="abandon-warning-panel" role="dialog" aria-modal="true" aria-labelledby="abandon-warning-title" aria-describedby="abandon-warning-desc">
         <span class="abandon-warning-kicker">주의</span>
-        <h2 id="abandon-warning-title" class="abandon-warning-title">무한 모드를 포기할까요?</h2>
-        <p id="abandon-warning-desc" class="abandon-warning-desc">진행은 사라집니다. 크레딧은 유지됩니다.</p>
+        <h2 id="abandon-warning-title" class="abandon-warning-title">무한 모드를 중단할까요?</h2>
+        <p id="abandon-warning-desc" class="abandon-warning-desc">진행 중인 무한 모드 저장이 삭제됩니다.</p>
         <div class="abandon-warning-actions">
-          <button id="abandon-cancel-btn" class="panel-button secondary abandon-cancel-btn" type="button">
-            취소
-          </button>
-          <button id="abandon-confirm-btn" class="panel-button secondary abandon-confirm-btn" type="button">
-            중도 포기
-          </button>
+          <button id="abandon-cancel-btn" class="panel-button secondary abandon-cancel-btn" type="button">취소</button>
+          <button id="abandon-confirm-btn" class="panel-button secondary abandon-confirm-btn" type="button">중도 포기</button>
         </div>
       </div>
     `;
@@ -126,7 +118,7 @@
         </button>
         <button id="infinite-continue-btn" class="panel-button secondary" type="button">
           <span class="panel-button-title">이어하기</span>
-          <span class="panel-button-desc">마지막 무한 모드 저장 지점에서 계속합니다.</span>
+          <span class="panel-button-desc">마지막 무한 모드 저장에서 계속합니다.</span>
         </button>
       </div>
     `;
@@ -138,161 +130,21 @@
     infiniteAbandonBtn.textContent = '[중도 포기]';
     infiniteSelectPanel.appendChild(infiniteAbandonBtn);
 
-    const leaderboardPanel = document.createElement('section');
-    leaderboardPanel.id = 'leaderboard-panel';
-    leaderboardPanel.className = 'leaderboard-panel';
-    leaderboardPanel.hidden = true;
-    leaderboardPanel.innerHTML = `
-      <div class="leaderboard-head">
-        <span class="leaderboard-kicker">순위표</span>
-        <h4 class="leaderboard-title">무한 모드 기록</h4>
-      </div>
-      <form id="leaderboard-form" class="leaderboard-form" autocomplete="off">
-        <label class="leaderboard-field" for="leaderboard-nickname">
-          <span class="leaderboard-field-label">닉네임</span>
-          <input
-            id="leaderboard-nickname"
-            class="leaderboard-input"
-            type="text"
-            maxlength="16"
-            autocomplete="nickname"
-            spellcheck="false"
-            placeholder="이름을 입력"
-          >
-        </label>
-        <label class="leaderboard-field" for="leaderboard-password">
-          <span class="leaderboard-field-label">비밀번호</span>
-          <input
-            id="leaderboard-password"
-            class="leaderboard-input"
-            type="password"
-            maxlength="32"
-            autocomplete="new-password"
-            placeholder="비밀번호를 입력"
-          >
-        </label>
-        <button id="leaderboard-submit-btn" class="leaderboard-submit-btn" type="submit">
-          등록
-        </button>
-      </form>
-      <p id="leaderboard-message" class="leaderboard-message" aria-live="polite"></p>
-      <ol id="leaderboard-list" class="leaderboard-list" aria-label="무한 모드 순위표"></ol>
-    `;
-
     function renderInfiniteBestHud() {
       const record = infiniteBestRecord ?? readInfiniteBestRecord();
       const score = numberOr(record?.score, 0);
       const elapsedText = formatDuration(record?.elapsedMs);
-      bestScoreHud.textContent = `최고점수: ${score}\n기록시간: ${elapsedText}`;
-    }
-
-    const leaderboardForm = leaderboardPanel.querySelector('#leaderboard-form');
-    const leaderboardNicknameInput = leaderboardPanel.querySelector('#leaderboard-nickname');
-    const leaderboardPasswordInput = leaderboardPanel.querySelector('#leaderboard-password');
-    const leaderboardSubmitBtn = leaderboardPanel.querySelector('#leaderboard-submit-btn');
-    const leaderboardMessage = leaderboardPanel.querySelector('#leaderboard-message');
-    const leaderboardList = leaderboardPanel.querySelector('#leaderboard-list');
-    const leaderboardLastNicknameKey = 'upupup.io.leaderboard.lastNickname.v1';
-
-    function setLeaderboardMessage(message) {
-      if (leaderboardMessage) {
-        leaderboardMessage.textContent = message;
-      }
-    }
-
-    function readStoredLeaderboardNickname() {
-      const stored = readJSONStorage(leaderboardLastNicknameKey);
-      return typeof stored === 'string' ? stored : '';
-    }
-
-    function storeLeaderboardNickname(nickname) {
-      try {
-        writeJSONStorage(leaderboardLastNicknameKey, String(nickname || ''));
-      } catch {
-        // Ignore cache failures.
-      }
-    }
-
-    function renderLeaderboard() {
-      if (!leaderboardList) return;
-
-      const entries = readLeaderboardEntries();
-      leaderboardList.innerHTML = '';
-
-      if (!entries.length) {
-        const emptyItem = document.createElement('li');
-        emptyItem.className = 'leaderboard-empty';
-        emptyItem.textContent = '아직 등록된 순위가 없습니다.';
-        leaderboardList.appendChild(emptyItem);
-        return;
-      }
-
-      for (const [index, entry] of entries.slice(0, LEADERBOARD_MAX_ENTRIES).entries()) {
-        const row = document.createElement('li');
-        row.className = 'leaderboard-item';
-
-        const rank = document.createElement('span');
-        rank.className = 'leaderboard-rank';
-        rank.textContent = String(index + 1).padStart(2, '0');
-
-        const name = document.createElement('span');
-        name.className = 'leaderboard-name';
-        name.textContent = entry.nickname;
-
-        const meta = document.createElement('span');
-        meta.className = 'leaderboard-meta';
-        meta.textContent = `${numberOr(entry.score, 0)} · ${formatDuration(entry.elapsedMs)}`;
-
-        row.append(rank, name, meta);
-        leaderboardList.appendChild(row);
-      }
-    }
-
-    function syncLeaderboardDefaults() {
-      if (leaderboardNicknameInput && !leaderboardNicknameInput.value) {
-        leaderboardNicknameInput.value = readStoredLeaderboardNickname();
-      }
-      if (leaderboardPasswordInput) {
-        leaderboardPasswordInput.value = '';
-      }
-    }
-
-    function submitLeaderboardFromForm(event) {
-      event.preventDefault();
-
-      const nickname = leaderboardNicknameInput?.value ?? '';
-      const password = leaderboardPasswordInput?.value ?? '';
-      const record = readInfiniteBestRecord();
-      const result = submitLeaderboardEntry({
-        nickname,
-        password,
-        score: record?.score ?? 0,
-        elapsedMs: record?.elapsedMs ?? null,
-      });
-
-      if (!result.ok) {
-        setLeaderboardMessage(result.error || '등록에 실패했습니다.');
-        return;
-      }
-
-      storeLeaderboardNickname(nickname);
-      if (leaderboardPasswordInput) {
-        leaderboardPasswordInput.value = '';
-      }
-      setLeaderboardMessage(result.updated ? '순위표를 갱신했습니다.' : '순위표에 등록했습니다.');
-      renderLeaderboard();
+      bestScoreHud.textContent = `최고 점수: ${score}\n기록 시간: ${elapsedText}`;
     }
 
     if (menuContinueNote) {
       menuContinueNote.insertAdjacentElement('beforebegin', stageSelectPanel);
       menuContinueNote.insertAdjacentElement('beforebegin', infiniteSelectPanel);
     } else if (gamePanel) {
-      gamePanel.appendChild(stageSelectPanel);
-      gamePanel.appendChild(infiniteSelectPanel);
+      gamePanel.append(stageSelectPanel, infiniteSelectPanel);
     }
-    infiniteAbandonBtn.insertAdjacentElement('afterend', leaderboardPanel);
-    document.body.appendChild(stageClearPopup);
-    document.body.appendChild(abandonWarningPopup);
+
+    document.body.append(stageClearPopup, abandonWarningPopup);
 
     const stageBackBtn = stageSelectPanel.querySelector('#stage-back-btn');
     const stageGrid = stageSelectPanel.querySelector('#stage-grid');
@@ -303,6 +155,7 @@
     const stageClearConfirmBtn = stageClearPopup.querySelector('#stage-clear-confirm-btn');
     const abandonCancelBtn = abandonWarningPopup.querySelector('#abandon-cancel-btn');
     const abandonConfirmBtn = abandonWarningPopup.querySelector('#abandon-confirm-btn');
+
     let stageClearConfirmAction = null;
     let abandonConfirmAction = null;
 
@@ -311,7 +164,8 @@
       onStartInfiniteMode: () => setStatus('무한 모드를 선택하세요.'),
       onStartStage: () => setStatus('스테이지를 시작합니다.'),
       onStartInfiniteNew: () => setStatus('새 무한 게임을 시작합니다.'),
-      onContinueInfinite: () => setStatus('무한 저장 데이터를 불러옵니다.'),
+      onContinueInfinite: () => setStatus('무한 모드 저장을 불러옵니다.'),
+      onAbandonInfinite: () => setStatus('무한 모드를 중단합니다.'),
       onSetGridVisible: () => undefined,
       onQuit: () => setStatus('게임 종료는 아직 준비되지 않았습니다.'),
       onSetAudioVolume: () => undefined,
@@ -346,6 +200,7 @@
       stageClearConfirmAction = typeof onConfirm === 'function' ? onConfirm : null;
       const title = stageClearPopup.querySelector('#stage-clear-title');
       const desc = stageClearPopup.querySelector('#stage-clear-desc');
+
       if (title) {
         title.textContent = `스테이지 ${numberOr(stage, 1)} 클리어`;
       }
@@ -355,6 +210,7 @@
       if (stageClearRewardValue) {
         stageClearRewardValue.textContent = `+${numberOr(reward, 0)} 크레딧`;
       }
+
       stageClearPopup.hidden = false;
     }
 
@@ -376,12 +232,14 @@
       if (generalKicker) generalKicker.textContent = '일반';
       if (generalTitle) generalTitle.textContent = '일반';
       if (generalDesc) {
-        generalDesc.textContent = '스테이지를 하나씩 선택해 바로 시작합니다.';
+        generalDesc.textContent = '스테이지를 하나 선택해 바로 시작합니다.';
       }
 
       if (infiniteKicker) infiniteKicker.textContent = '무한';
       if (infiniteTitle) infiniteTitle.textContent = '무한';
-      if (infiniteDesc) infiniteDesc.textContent = '새 게임을 만들거나 저장된 진행을 이어서 시작합니다.';
+      if (infiniteDesc) {
+        infiniteDesc.textContent = '새 게임을 만들거나 저장된 진행에서 이어서 시작합니다.';
+      }
     }
 
     function renderStageCards() {
@@ -389,6 +247,7 @@
 
       const unlockedLimit = getUnlockedStageLimit();
       stageGrid.innerHTML = '';
+
       for (let stageNumber = 1; stageNumber <= stageCount; stageNumber++) {
         const locked = stageNumber > unlockedLimit && !hasStageEditorStage(stageNumber);
         const button = document.createElement('button');
@@ -444,17 +303,12 @@
       if (showInfinite) {
         infiniteBestRecord = readInfiniteBestRecord();
         renderInfiniteBestHud();
-        syncLeaderboardDefaults();
-        renderLeaderboard();
         bestScoreHud.classList.remove('is-game-hud');
         bestScoreHud.classList.add('is-menu-hud');
         bestScoreHud.hidden = false;
-        leaderboardPanel.hidden = false;
       } else {
         bestScoreHud.classList.remove('is-menu-hud', 'is-game-hud');
         bestScoreHud.hidden = true;
-        leaderboardPanel.hidden = true;
-        setLeaderboardMessage('');
       }
     }
 
@@ -506,17 +360,19 @@
 
       if (menuContinueNote) {
         menuContinueNote.textContent = hasSave
-          ? `마지막 저장: ${formatTime(saved.savedAt ?? Date.now())} | ${saved?.mode === 'stage'
+          ? `마지막 저장 ${formatTime(saved.savedAt ?? Date.now())} | ${saved?.mode === 'stage'
             ? `일반 ${numberOr(saved.stage, 1)}단계`
             : '무한 모드'} | 점수 ${numberOr(saved.score, 0)}`
-          : '일반은 스테이지 선택, 무한은 새 게임/이어하기입니다.';
+          : '일반은 스테이지 선택, 무한은 새 게임 또는 이어하기를 사용합니다.';
       }
     }
 
     function setGridVisible(visible) {
       gridVisible = Boolean(visible);
       if (gridToggleBtn) {
-        gridToggleBtn.textContent = gridVisible ? '그리드 켜짐' : '그리드 꺼짐';
+        gridToggleBtn.innerHTML = gridVisible
+          ? '<span class="panel-button-title">격자 끄기</span><span class="panel-button-desc">맵의 격자선을 숨깁니다.</span>'
+          : '<span class="panel-button-title">격자 켜기</span><span class="panel-button-desc">맵의 격자선을 표시합니다.</span>';
       }
       writePrefs({ autoSaveEnabled, gridVisible, audioVolume });
     }
@@ -610,8 +466,6 @@
         });
       });
 
-      leaderboardForm?.addEventListener('submit', submitLeaderboardFromForm);
-
       stageGrid?.addEventListener('click', (event) => {
         const button = event.target.closest('button[data-stage-number]');
         if (!button || button.disabled) return;
@@ -666,6 +520,7 @@
 
     bind();
     setActiveTab(activeTab);
+
     const savedState = storageReadSave();
     updateMenuState(savedState);
     setCreditBalance(savedState?.credits);

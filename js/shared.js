@@ -9,10 +9,18 @@
   const CREDIT_BALANCE_KEY = 'upupup.io.creditBalance.v1';
   const INFINITE_BEST_SCORE_KEY = 'upupup.io.infiniteBestScore.v1';
   const INFINITE_BEST_RECORD_KEY = 'upupup.io.infiniteBestRecord.v1';
-  const LEADERBOARD_KEY = 'upupup.io.leaderboard.v1';
   const STAGE_PROGRESS_KEY = 'upupup.io.stageProgress.v1';
   const STAGE_EDITOR_DRAFT_KEY = 'upupup.stage-editor.draft.v1';
   const STAGE_EDITOR_STAGE_PREFIX = 'upupup.stage-editor.stage.v1.';
+  const REMOVED_LOCAL_STORAGE_KEYS = [
+    'upupup.io.leaderboard.v1',
+    'upupup.io.leaderboardSortMode.v1',
+    'upupup.io.devMode.v1',
+    'upupup.io.accounts.v1',
+    'upupup.io.account.lastNickname.v1',
+  ];
+  const REMOVED_SESSION_STORAGE_KEYS = ['upupup.io.activeAccount.v1'];
+  const REMOVED_SECURE_RECORDS = ['leaderboard-record'];
 
   const SECURE_DB_NAME = 'upupup.io.secure.v1';
   const SECURE_DB_VERSION = 1;
@@ -21,7 +29,6 @@
   const SECURE_SAVE_RECORD = 'save-state';
   const SECURE_INFINITE_BEST_RECORD = 'infinite-best-record';
   const SECURE_STAGE_PROGRESS_RECORD = 'stage-progress';
-  const LEADERBOARD_MAX_ENTRIES = 10;
 
   let secureDb = null;
   let secureDbPromise = null;
@@ -206,135 +213,6 @@
       score: normalizeScore(raw.score),
       elapsedMs: normalizeElapsedMs(raw.elapsedMs),
       savedAt: Number.isFinite(raw.savedAt) ? Math.max(0, Math.floor(raw.savedAt)) : 0,
-    };
-  }
-
-  function normalizeLeaderboardNickname(value) {
-    return String(value ?? '')
-      .trim()
-      .replace(/\s+/g, ' ')
-      .slice(0, 16);
-  }
-
-  function normalizeLeaderboardEntry(raw) {
-    if (!raw || typeof raw !== 'object') return null;
-
-    const nickname = normalizeLeaderboardNickname(raw.nickname);
-    const passwordHash = String(raw.passwordHash ?? '');
-    if (!nickname || !passwordHash) return null;
-
-    return {
-      nickname,
-      passwordHash,
-      score: normalizeScore(raw.score),
-      elapsedMs: normalizeElapsedMs(raw.elapsedMs),
-      savedAt: Number.isFinite(raw.savedAt) ? Math.max(0, Math.floor(raw.savedAt)) : 0,
-    };
-  }
-
-  function isLeaderboardEntryBetter(candidate, current) {
-    if (!current) return true;
-    if (candidate.score !== current.score) {
-      return candidate.score > current.score;
-    }
-
-    const candidateElapsed = Number.isFinite(candidate.elapsedMs) ? candidate.elapsedMs : Number.POSITIVE_INFINITY;
-    const currentElapsed = Number.isFinite(current.elapsedMs) ? current.elapsedMs : Number.POSITIVE_INFINITY;
-    if (candidateElapsed !== currentElapsed) {
-      return candidateElapsed < currentElapsed;
-    }
-
-    return candidate.savedAt > current.savedAt;
-  }
-
-  function compareLeaderboardEntries(a, b) {
-    if (a.score !== b.score) {
-      return b.score - a.score;
-    }
-
-    const aElapsed = Number.isFinite(a.elapsedMs) ? a.elapsedMs : Number.POSITIVE_INFINITY;
-    const bElapsed = Number.isFinite(b.elapsedMs) ? b.elapsedMs : Number.POSITIVE_INFINITY;
-    if (aElapsed !== bElapsed) {
-      return aElapsed - bElapsed;
-    }
-
-    return b.savedAt - a.savedAt;
-  }
-
-  function readLeaderboardEntries() {
-    const raw = readJSONStorage(LEADERBOARD_KEY);
-    const entries = Array.isArray(raw)
-      ? raw.map(normalizeLeaderboardEntry).filter(Boolean)
-      : [];
-    return entries.sort(compareLeaderboardEntries).slice(0, LEADERBOARD_MAX_ENTRIES);
-  }
-
-  function writeLeaderboardEntries(entries) {
-    try {
-      const normalized = Array.isArray(entries)
-        ? entries.map(normalizeLeaderboardEntry).filter(Boolean).sort(compareLeaderboardEntries).slice(0, LEADERBOARD_MAX_ENTRIES)
-        : [];
-      writeJSONStorage(LEADERBOARD_KEY, normalized);
-    } catch {
-      return false;
-    }
-    return true;
-  }
-
-  function submitLeaderboardEntry({
-    nickname,
-    password,
-    score,
-    elapsedMs = null,
-    savedAt = Date.now(),
-  } = {}) {
-    const cleanNickname = normalizeLeaderboardNickname(nickname);
-    const cleanPassword = String(password ?? '').trim();
-    const normalizedScore = normalizeScore(score);
-
-    if (!cleanNickname || !cleanPassword) {
-      return { ok: false, error: '닉네임과 비밀번호를 입력하세요.' };
-    }
-    if (normalizedScore <= 0) {
-      return { ok: false, error: '등록할 점수가 없습니다.' };
-    }
-
-    const candidate = {
-      nickname: cleanNickname,
-      passwordHash: String(fnv1a(cleanPassword)),
-      score: normalizedScore,
-      elapsedMs: normalizeElapsedMs(elapsedMs),
-      savedAt: Number.isFinite(savedAt) ? Math.max(0, Math.floor(savedAt)) : Date.now(),
-    };
-
-    const entries = readLeaderboardEntries();
-    const existingIndex = entries.findIndex((entry) => entry.nickname === cleanNickname);
-    let nextEntry = candidate;
-
-    if (existingIndex >= 0) {
-      const current = entries[existingIndex];
-      if (current.passwordHash !== candidate.passwordHash) {
-        return { ok: false, error: '비밀번호가 맞지 않습니다.' };
-      }
-
-      if (isLeaderboardEntryBetter(candidate, current)) {
-        nextEntry = { ...current, ...candidate };
-        entries[existingIndex] = nextEntry;
-      } else {
-        nextEntry = current;
-      }
-    } else {
-      entries.push(candidate);
-    }
-
-    if (!writeLeaderboardEntries(entries)) {
-      return { ok: false, error: '순위표 저장에 실패했습니다.' };
-    }
-
-    return {
-      ok: true,
-      entry: nextEntry,
-      updated: existingIndex >= 0,
     };
   }
 
@@ -599,6 +477,40 @@
     return true;
   }
 
+  async function cleanupRemovedFeatures() {
+    for (const key of REMOVED_LOCAL_STORAGE_KEYS) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore cleanup failures.
+      }
+    }
+
+    for (const key of REMOVED_SESSION_STORAGE_KEYS) {
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        // Ignore cleanup failures.
+      }
+    }
+
+    if (!secureStorageSupported || !REMOVED_SECURE_RECORDS.length) {
+      return;
+    }
+
+    try {
+      const db = await getSecureDb();
+      const tx = db.transaction(SECURE_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(SECURE_STORE_NAME);
+      for (const recordName of REMOVED_SECURE_RECORDS) {
+        store.delete(recordName);
+      }
+      await txDone(tx);
+    } catch {
+      // Ignore secure cleanup failures.
+    }
+  }
+
   function readLegacySave() {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
@@ -649,6 +561,8 @@
 
   async function loadSecureCache() {
     secureStorageSupported = Boolean(window.indexedDB && window.crypto?.subtle);
+    await cleanupRemovedFeatures();
+
     if (!secureStorageSupported) {
       cachedSave = deepFreeze(normalizeSaveData(readLegacySave()));
       cachedInfiniteBestRecord = deepFreeze(normalizeInfiniteBestRecord(readLegacyInfiniteBestRecord()));
@@ -671,18 +585,17 @@
       const legacySave = normalizeSaveData(readLegacySave());
       const legacyBestRecord = normalizeInfiniteBestRecord(readLegacyInfiniteBestRecord());
       const legacyProgress = normalizeStageProgressData(readLegacyStageProgress());
+
       cachedSave = readJSONStorage(SAVE_TOMBSTONE_KEY)
         ? null
         : deepFreeze(normalizeSaveData(decodedSave) ?? legacySave);
       cachedInfiniteBestRecord = deepFreeze(decodedBestRecord ? normalizeInfiniteBestRecord(decodedBestRecord) : legacyBestRecord);
       cachedStageProgress = deepFreeze(normalizeStageProgressData(decodedProgress) ?? legacyProgress);
 
-      if (!saveRecord) {
-        if (legacySave) {
-          cachedSave = deepFreeze(legacySave);
-          const record = await encryptRecord(SECURE_SAVE_RECORD, legacySave);
-          await writeSecureRecord(SECURE_SAVE_RECORD, record);
-        }
+      if (!saveRecord && legacySave) {
+        cachedSave = deepFreeze(legacySave);
+        const record = await encryptRecord(SECURE_SAVE_RECORD, legacySave);
+        await writeSecureRecord(SECURE_SAVE_RECORD, record);
       }
 
       if (!bestRecord) {
@@ -923,10 +836,6 @@
     readInfiniteBestScore,
     writeInfiniteBestRecord,
     writeInfiniteBestScore,
-    LEADERBOARD_MAX_ENTRIES,
-    readLeaderboardEntries,
-    writeLeaderboardEntries,
-    submitLeaderboardEntry,
     STAGE_PROGRESS_KEY,
     STAGE_EDITOR_DRAFT_KEY,
     STAGE_EDITOR_STAGE_PREFIX,
