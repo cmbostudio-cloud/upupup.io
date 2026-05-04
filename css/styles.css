@@ -1149,3 +1149,30 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+.auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2200;
+}
+
+.auth-modal {
+  width: min(92vw, 420px);
+  border-radius: 16px;
+  background: #10131f;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 20px;
+  color: #fff;
+}
+
+.auth-tab-row { display:flex; gap:8px; margin:12px 0; }
+.auth-tab { flex:1; padding:8px; border-radius:10px; border:1px solid #3d4663; background:#1a2136; color:#d8e0ff; }
+.auth-tab.is-active { background:#2c3f82; border-color:#6b8dff; color:#fff; }
+.auth-google-btn, .auth-cancel-btn { width:100%; margin-top:10px; padding:12px; border-radius:10px; border:0; }
+.auth-google-btn { background:#ffffff; color:#10131f; font-weight:700; }
+.auth-cancel-btn { background:#29314a; color:#fff; }
+.auth-hint { min-height:20px; color:#c8d4ff; font-size:13px; margin-top:8px; }
