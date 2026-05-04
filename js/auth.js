@@ -29,21 +29,21 @@
     if (authModal) return authModal;
 
     const overlay = document.createElement('div');
-    overlay.className = 'auth-modal-overlay';
+    overlay.className = 'auth-screen';
     overlay.hidden = true;
     overlay.innerHTML = `
-      <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <h2 id="auth-title" class="auth-title">무한 모드 로그인</h2>
         <p class="auth-desc">무한 모드를 하려면 먼저 로그인 또는 회원가입이 필요합니다.</p>
 
-        <div class="auth-tab-row" role="tablist" aria-label="인증 선택">
-          <button class="auth-tab is-active" data-auth-tab="login" aria-selected="true" type="button">로그인</button>
-          <button class="auth-tab" data-auth-tab="signup" aria-selected="false" type="button">회원가입</button>
+        <div class="auth-mode-row" role="tablist" aria-label="인증 선택">
+          <button class="auth-mode-btn is-active" data-auth-mode-btn="login" aria-selected="true" type="button">로그인</button>
+          <button class="auth-mode-btn" data-auth-mode-btn="signup" aria-selected="false" type="button">회원가입</button>
         </div>
 
-        <button class="auth-google-btn" data-auth-action="google" type="button">Google로 로그인</button>
+        <button class="auth-line-btn" data-auth-action="google" type="button">Google로 로그인</button>
         <p class="auth-hint" id="auth-hint" aria-live="polite"></p>
-        <button class="auth-cancel-btn" type="button">취소</button>
+        <button class="auth-line-btn auth-cancel-btn" type="button">취소</button>
       </div>
     `;
 
@@ -54,9 +54,9 @@
 
   function setAuthTab(tab) {
     if (!authModal) return;
-    const tabs = authModal.querySelectorAll('[data-auth-tab]');
+    const tabs = authModal.querySelectorAll('[data-auth-mode-btn]');
     tabs.forEach((btn) => {
-      const active = btn.dataset.authTab === tab;
+      const active = btn.dataset.authModeBtn === tab;
       btn.classList.toggle('is-active', active);
       btn.setAttribute('aria-selected', String(active));
     });
@@ -76,7 +76,7 @@
     const overlay = ensureAuthModal();
     const hint = overlay.querySelector('#auth-hint');
     const cancelBtn = overlay.querySelector('.auth-cancel-btn');
-    const tabButtons = Array.from(overlay.querySelectorAll('[data-auth-tab]'));
+    const tabButtons = Array.from(overlay.querySelectorAll('[data-auth-mode-btn]'));
     const googleButton = overlay.querySelector('[data-auth-action="google"]');
 
     let currentTab = 'login';
@@ -118,7 +118,7 @@
 
       for (const tabBtn of tabButtons) {
         const handler = () => {
-          currentTab = tabBtn.dataset.authTab;
+          currentTab = tabBtn.dataset.authModeBtn;
           setAuthTab(currentTab);
           updateGoogleLabel();
         };
