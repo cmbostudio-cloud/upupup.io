@@ -336,6 +336,9 @@
 
     function setMenuVisible(visible) {
       menuOverlay.style.display = visible ? 'flex' : 'none';
+      if (editorAccessBtn) {
+        editorAccessBtn.hidden = !visible;
+      }
       if (visible) {
         setActiveTab(activeTab);
         setGameView(gameView);
