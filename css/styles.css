@@ -1226,3 +1226,18 @@ body {
 .auth-cancel-btn {
   margin-top: 18px;
 }
+
+.infinite-ranking-panel {
+  margin-top: 16px;
+  border-top: 1px dashed rgba(34, 34, 34, 0.25);
+  padding-top: 12px;
+}
+.ranking-head { margin-bottom: 8px; }
+.ranking-title { margin: 0; font-size: 20px; }
+.ranking-my-status { margin: 4px 0 0; font-size: 12px; opacity: 0.8; }
+.ranking-nickname-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.ranking-nickname-input { min-height: 42px; border: 2px solid var(--line); border-radius: 10px; padding: 0 10px; font-family: "Courier New", monospace; }
+.ranking-submit-btn { min-height: 42px; width: auto; padding: 8px 12px; }
+.ranking-list { margin: 10px 0 0; padding-left: 20px; max-height: 180px; overflow: auto; }
+.ranking-item { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.ranking-empty { opacity: 0.7; }
