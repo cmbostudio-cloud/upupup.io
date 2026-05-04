@@ -183,6 +183,7 @@
     let stageClearConfirmAction = null;
     let abandonConfirmAction = null;
     let rankingSyncTimer = null;
+    let rankingUnsubscribe = null;
 
     let actions = {
       onStartStageMode: () => setStatus('스테이지를 선택하세요.'),
@@ -295,20 +296,34 @@
     }
 
 
+    function renderRanking(items) {
+      if (!rankingList) return;
+      if (!Array.isArray(items)) {
+        rankingList.innerHTML = '<li class="ranking-empty">랭킹을 불러오지 못했습니다.</li>';
+        return;
+      }
+      if (!items.length) {
+        rankingList.innerHTML = '<li class="ranking-empty">아직 등록된 기록이 없습니다.</li>';
+        return;
+      }
+      rankingList.innerHTML = items.map((item) => (`<li class="ranking-item"><span>#${item.rank} ${item.nickname}</span><strong>${item.score}</strong></li>`)).join('');
+    }
+
     async function refreshRanking() {
       const auth = window.UpUpUpAuth;
       if (!rankingList || !auth?.getInfiniteRanking) return;
       rankingList.innerHTML = '<li class="ranking-empty">불러오는 중...</li>';
       try {
-        const items = await auth.getInfiniteRanking(20);
-        if (!items.length) {
-          rankingList.innerHTML = '<li class="ranking-empty">아직 등록된 기록이 없습니다.</li>';
-          return;
-        }
-        rankingList.innerHTML = items.map((item) => (`<li class="ranking-item"><span>#${item.rank} ${item.nickname}</span><strong>${item.score}</strong></li>`)).join('');
+        renderRanking(await auth.getInfiniteRanking(20));
       } catch {
-        rankingList.innerHTML = '<li class="ranking-empty">랭킹을 불러오지 못했습니다.</li>';
+        renderRanking(null);
       }
+    }
+
+    function ensureRankingRealtimeSync() {
+      const auth = window.UpUpUpAuth;
+      if (!auth?.subscribeInfiniteRanking || rankingUnsubscribe) return;
+      rankingUnsubscribe = auth.subscribeInfiniteRanking((items) => renderRanking(items), 20);
     }
 
     async function syncMyRankingState() {
@@ -385,6 +400,7 @@
       }
 
       if (showInfinite) {
+        ensureRankingRealtimeSync();
         refreshRanking();
         syncMyRankingState();
         infiniteBestRecord = readInfiniteBestRecord();
@@ -564,11 +580,8 @@
         }
 
         const record = readInfiniteBestRecord();
-        const nickname = rankingNicknameInput?.value?.trim();
-        if (!nickname) {
-          setStatus('닉네임을 입력해 주세요.');
-          return;
-        }
+        const nickname = rankingNicknameInput?.value?.trim() || user.displayName || '익명';
+        if (rankingNicknameInput && !rankingNicknameInput.value.trim()) rankingNicknameInput.value = nickname;
 
         rankingSubmitBtn.disabled = true;
         try {
@@ -599,6 +612,9 @@
         }
       });
       window.addEventListener('upupup:infinite-best-record-updated', scheduleRankingAutoSync);
+      window.addEventListener('beforeunload', () => {
+        if (rankingUnsubscribe) rankingUnsubscribe();
+      });
 
       infiniteAbandonBtn?.addEventListener('click', () => {
         if (infiniteAbandonBtn.disabled) return;

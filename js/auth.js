@@ -223,6 +223,31 @@
     });
   }
 
+  function subscribeInfiniteRanking(callback, limit = LEADERBOARD_LIMIT) {
+    init();
+    if (!db || typeof callback !== 'function') return () => {};
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(Number(limit) || LEADERBOARD_LIMIT)));
+    return db
+      .collection(LEADERBOARD_COLLECTION)
+      .orderBy('score', 'desc')
+      .orderBy('updatedAt', 'asc')
+      .limit(safeLimit)
+      .onSnapshot((snap) => {
+        const items = snap.docs.map((doc, index) => {
+          const data = doc.data() || {};
+          return {
+            rank: index + 1,
+            uid: data.uid || doc.id,
+            nickname: normalizeNickname(data.nickname) || '익명',
+            score: normalizeScore(data.score),
+          };
+        });
+        callback(items);
+      }, () => {
+        callback(null);
+      });
+  }
+
   async function getMyInfiniteRanking() {
     init();
     if (!db || !auth.currentUser) return null;
@@ -260,6 +285,7 @@
     waitForAuthReady,
     upsertInfiniteRanking,
     getInfiniteRanking,
+    subscribeInfiniteRanking,
     getMyInfiniteRanking,
   };
 })();
