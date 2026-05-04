@@ -94,7 +94,7 @@
       return {
         version: 1,
         stage: stageNumber,
-        name: String(raw.name || `?ㅽ뀒?댁? ${stageNumber}`),
+        name: String(raw.name || `스테이지 ${stageNumber}`),
         settings: {
           mapWidth,
           groundY,
@@ -179,9 +179,10 @@
       collectedPortalIds: initialSave?.map?.collectedPortalIds ?? [],
     });
 
-    stageStarTotal = gameMode === 'stage' ? (map.stars ?? map.portals ?? []).length : 0;
+    const stageCollectibles = gameMode === 'stage' ? (map.stars ?? map.portals ?? []) : [];
+    stageStarTotal = gameMode === 'stage' ? stageCollectibles.length : 0;
     stageStarsCollected = gameMode === 'stage'
-      ? (map.stars ?? map.portals ?? []).filter((star) => star.collected).length
+      ? stageCollectibles.filter((star) => star.collected).length
       : 0;
 
     if (initialSave?.map?.nextSpawnY != null) {
@@ -746,7 +747,7 @@
         if (windmill.chunk && !windmill.chunk.container.visible) continue;
         windmill.blades.rotation += windmill.speed;
       }
-      for (const star of map.stars || map.portals || []) {
+      for (const star of stageCollectibles) {
         if (!star || star.collected) continue;
         if (star.ringLayer) {
           const pulse = 1 + Math.sin(now * (star.pulseSpeed ?? 2) + (star.phase ?? 0)) * (star.pulseAmplitude ?? 0.05);
@@ -755,7 +756,7 @@
       }
       player.update();
       if (gameMode === 'stage') {
-        for (const star of map.stars || map.portals || []) {
+        for (const star of stageCollectibles) {
           if (!star || star.collected) continue;
           if (!rectIntersectsRect(player.gfx, star)) continue;
           if (collectStageStar(star)) break;
