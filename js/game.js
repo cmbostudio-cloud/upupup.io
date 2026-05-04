@@ -3,6 +3,7 @@ void (async () => {
   await ready;
 
   const shell = window.UpUpUpUI.createUIController();
+  const auth = window.UpUpUpAuth;
   const initialSave = storageReadSave();
   const audio = window.UpUpUpAudio?.createAudioManager?.(shell.getPreferences().audioVolume) ?? null;
   const canvas = document.getElementById('game-canvas');
@@ -25,7 +26,30 @@ void (async () => {
     });
   }
 
-  function startInfiniteMode() {
+  async function requireInfiniteAuth() {
+    if (!auth) {
+      shell.setStatus('인증 모듈을 찾을 수 없습니다.');
+      return false;
+    }
+
+    try {
+      await auth.ensureSignedIn();
+      return true;
+    } catch (error) {
+      const code = error?.code ?? '';
+      if (code.includes('popup-closed')) {
+        shell.setStatus('로그인이 취소되었습니다.');
+      } else {
+        shell.setStatus('로그인에 실패했습니다. 다시 시도해 주세요.');
+      }
+      return false;
+    }
+  }
+
+  async function startInfiniteMode() {
+    const passed = await requireInfiniteAuth();
+    if (!passed) return;
+
     shell.setStatus('무한 모드를 선택하세요.');
     shell.setGameView?.('infinite');
   }
@@ -35,7 +59,10 @@ void (async () => {
     shell.setGameView?.('stages');
   }
 
-  function startInfiniteNew() {
+  async function startInfiniteNew() {
+    const passed = await requireInfiniteAuth();
+    if (!passed) return;
+
     beginGame({
       mode: 'infinite',
       stage: 1,
@@ -43,7 +70,10 @@ void (async () => {
     });
   }
 
-  function continueInfinite() {
+  async function continueInfinite() {
+    const passed = await requireInfiniteAuth();
+    if (!passed) return;
+
     const latestSave = storageReadSave();
     const saved = latestSave && latestSave.mode === 'infinite'
       ? latestSave
