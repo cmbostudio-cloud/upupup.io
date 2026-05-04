@@ -52,8 +52,20 @@
       return auth.currentUser;
     }
 
-    const result = await auth.signInWithPopup(googleProvider);
-    return result.user;
+    try {
+      const result = await auth.signInWithPopup(googleProvider);
+      return result.user;
+    } catch (error) {
+      const code = error?.code ?? '';
+
+      // iOS/Safari 등에서 팝업이 즉시 닫히는 환경을 위해 Redirect 방식으로 한 번 더 시도합니다.
+      if (code.includes('popup-blocked') || code.includes('cancelled-popup-request')) {
+        await auth.signInWithRedirect(googleProvider);
+        return null;
+      }
+
+      throw error;
+    }
   }
 
   async function signOut() {
