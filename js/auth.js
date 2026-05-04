@@ -18,6 +18,7 @@
   let googleProvider = null;
   let analytics = null;
   let authModal = null;
+  let authReadyPromise = null;
 
   function init() {
     if (app) return;
@@ -28,6 +29,18 @@
     db = window.firebase.firestore ? window.firebase.firestore() : null;
     googleProvider = new window.firebase.auth.GoogleAuthProvider();
     if (window.firebase.analytics) analytics = window.firebase.analytics();
+    authReadyPromise = new Promise((resolve) => {
+      const unsub = auth.onAuthStateChanged(() => {
+        unsub();
+        resolve(auth.currentUser);
+      });
+    });
+  }
+
+  async function waitForAuthReady() {
+    init();
+    await authReadyPromise;
+    return auth.currentUser;
   }
 
   function ensureAuthModal() {
@@ -69,6 +82,7 @@
 
   async function ensureSignedIn() {
     init();
+    await waitForAuthReady();
     if (auth.currentUser) return auth.currentUser;
     const result = await auth.signInWithPopup(googleProvider);
     return result.user;
@@ -76,6 +90,7 @@
 
   async function promptAuthGate() {
     init();
+    await waitForAuthReady();
     if (auth.currentUser) return auth.currentUser;
 
     const overlay = ensureAuthModal();
@@ -242,6 +257,7 @@
     },
     signOut,
     getAnalytics: () => analytics,
+    waitForAuthReady,
     upsertInfiniteRanking,
     getInfiniteRanking,
     getMyInfiniteRanking,

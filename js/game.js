@@ -33,6 +33,7 @@ void (async () => {
     }
 
     try {
+      await auth.waitForAuthReady?.();
       const user = await auth.promptAuthGate();
       if (!user) {
         shell.setStatus('로그인이 필요합니다.');

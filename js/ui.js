@@ -142,6 +142,9 @@
         <input id="ranking-nickname-input" class="ranking-nickname-input" type="text" maxlength="20" placeholder="닉네임 입력" aria-label="닉네임">
         <button id="ranking-submit-btn" class="panel-button secondary ranking-submit-btn" type="button">내 기록 등록/갱신</button>
       </div>
+      <div class="ranking-auth-row">
+        <button id="ranking-logout-btn" class="ranking-logout-btn" type="button">로그아웃</button>
+      </div>
       <ol id="ranking-list" class="ranking-list"></ol>
     `;
     infiniteSelectPanel.appendChild(rankingPanel);
@@ -171,6 +174,7 @@
     const rankingMyStatus = rankingPanel.querySelector('#ranking-my-status');
     const rankingNicknameInput = rankingPanel.querySelector('#ranking-nickname-input');
     const rankingSubmitBtn = rankingPanel.querySelector('#ranking-submit-btn');
+    const rankingLogoutBtn = rankingPanel.querySelector('#ranking-logout-btn');
     const rankingList = rankingPanel.querySelector('#ranking-list');
     const stageClearConfirmBtn = stageClearPopup.querySelector('#stage-clear-confirm-btn');
     const abandonCancelBtn = abandonWarningPopup.querySelector('#abandon-cancel-btn');
@@ -178,6 +182,7 @@
 
     let stageClearConfirmAction = null;
     let abandonConfirmAction = null;
+    let rankingSyncTimer = null;
 
     let actions = {
       onStartStageMode: () => setStatus('스테이지를 선택하세요.'),
@@ -311,8 +316,10 @@
       const user = auth?.getUser?.();
       if (!user) {
         if (rankingMyStatus) rankingMyStatus.textContent = '로그인 후 기록을 등록할 수 있습니다.';
+        if (rankingLogoutBtn) rankingLogoutBtn.hidden = true;
         return;
       }
+      if (rankingLogoutBtn) rankingLogoutBtn.hidden = false;
       try {
         const mine = await auth.getMyInfiniteRanking();
         if (rankingNicknameInput) rankingNicknameInput.value = mine?.nickname || user.displayName || '';
@@ -322,6 +329,28 @@
       } catch {
         if (rankingMyStatus) rankingMyStatus.textContent = '내 랭킹 상태를 불러오지 못했습니다.';
       }
+    }
+
+    function scheduleRankingAutoSync() {
+      const auth = window.UpUpUpAuth;
+      const user = auth?.getUser?.();
+      if (!user) return;
+      if (rankingSyncTimer) clearTimeout(rankingSyncTimer);
+      rankingSyncTimer = setTimeout(async () => {
+        const record = readInfiniteBestRecord();
+        const nickname = rankingNicknameInput?.value?.trim() || user.displayName || '익명';
+        try {
+          await auth.upsertInfiniteRanking({
+            nickname,
+            score: numberOr(record?.score, 0),
+            elapsedMs: Number.isFinite(record?.elapsedMs) ? record.elapsedMs : null,
+          });
+          await refreshRanking();
+          await syncMyRankingState();
+        } catch {
+          // ignore background sync failures
+        }
+      }, 1200);
     }
 
     function setGameView(view) {
@@ -557,6 +586,19 @@
           rankingSubmitBtn.disabled = false;
         }
       });
+
+      rankingLogoutBtn?.addEventListener('click', async () => {
+        const auth = window.UpUpUpAuth;
+        try {
+          await auth?.signOut?.();
+          setStatus('로그아웃되었습니다.');
+          await syncMyRankingState();
+          await refreshRanking();
+        } catch {
+          setStatus('로그아웃에 실패했습니다.');
+        }
+      });
+      window.addEventListener('upupup:infinite-best-record-updated', scheduleRankingAutoSync);
 
       infiniteAbandonBtn?.addEventListener('click', () => {
         if (infiniteAbandonBtn.disabled) return;
