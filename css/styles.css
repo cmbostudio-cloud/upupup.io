@@ -309,6 +309,7 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-inline: auto;
+  pointer-events: none;
 }
 
 .menu-tab-button {
@@ -324,6 +325,7 @@ body {
   display: grid;
   align-content: center;
   gap: 4px;
+  pointer-events: auto;
   transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
 }
 
