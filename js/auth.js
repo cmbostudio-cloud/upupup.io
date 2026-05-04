@@ -9,11 +9,16 @@
     measurementId: 'G-RS93066VTN',
   };
 
+  const LEADERBOARD_COLLECTION = 'infiniteLeaderboard';
+  const LEADERBOARD_LIMIT = 20;
+
   let app = null;
   let auth = null;
+  let db = null;
   let googleProvider = null;
   let analytics = null;
   let authModal = null;
+  let authReadyPromise = null;
 
   function init() {
     if (app) return;
@@ -21,8 +26,21 @@
 
     app = window.firebase.apps.length ? window.firebase.app() : window.firebase.initializeApp(firebaseConfig);
     auth = window.firebase.auth();
+    db = window.firebase.firestore ? window.firebase.firestore() : null;
     googleProvider = new window.firebase.auth.GoogleAuthProvider();
     if (window.firebase.analytics) analytics = window.firebase.analytics();
+    authReadyPromise = new Promise((resolve) => {
+      const unsub = auth.onAuthStateChanged(() => {
+        unsub();
+        resolve(auth.currentUser);
+      });
+    });
+  }
+
+  async function waitForAuthReady() {
+    init();
+    await authReadyPromise;
+    return auth.currentUser;
   }
 
   function ensureAuthModal() {
@@ -64,6 +82,7 @@
 
   async function ensureSignedIn() {
     init();
+    await waitForAuthReady();
     if (auth.currentUser) return auth.currentUser;
     const result = await auth.signInWithPopup(googleProvider);
     return result.user;
@@ -71,6 +90,7 @@
 
   async function promptAuthGate() {
     init();
+    await waitForAuthReady();
     if (auth.currentUser) return auth.currentUser;
 
     const overlay = ensureAuthModal();
@@ -150,6 +170,74 @@
     });
   }
 
+  function normalizeNickname(name) {
+    return String(name ?? '').trim().slice(0, 20);
+  }
+
+  function normalizeScore(score) {
+    return Math.max(0, Math.floor(Number(score) || 0));
+  }
+
+  async function upsertInfiniteRanking({ nickname, score, elapsedMs }) {
+    init();
+    if (!db) throw new Error('Firestore SDK not loaded');
+    const user = auth.currentUser;
+    if (!user) throw new Error('Authentication required');
+
+    const ref = db.collection(LEADERBOARD_COLLECTION).doc(user.uid);
+    const safeNickname = normalizeNickname(nickname) || user.displayName || '익명';
+    const safeScore = normalizeScore(score);
+    const safeElapsedMs = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs)) : null;
+    const payload = {
+      uid: user.uid,
+      nickname: safeNickname,
+      score: safeScore,
+      elapsedMs: safeElapsedMs,
+      updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await ref.set(payload, { merge: true });
+    return { uid: user.uid, nickname: safeNickname, score: safeScore, elapsedMs: safeElapsedMs };
+  }
+
+  async function getInfiniteRanking(limit = LEADERBOARD_LIMIT) {
+    init();
+    if (!db) return [];
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(Number(limit) || LEADERBOARD_LIMIT)));
+    const snap = await db
+      .collection(LEADERBOARD_COLLECTION)
+      .orderBy('score', 'desc')
+      .orderBy('updatedAt', 'asc')
+      .limit(safeLimit)
+      .get();
+
+    return snap.docs.map((doc, index) => {
+      const data = doc.data() || {};
+      return {
+        rank: index + 1,
+        uid: data.uid || doc.id,
+        nickname: normalizeNickname(data.nickname) || '익명',
+        score: normalizeScore(data.score),
+      };
+    });
+  }
+
+  async function getMyInfiniteRanking() {
+    init();
+    if (!db || !auth.currentUser) return null;
+    const ref = db.collection(LEADERBOARD_COLLECTION).doc(auth.currentUser.uid);
+    const snap = await ref.get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    return {
+      uid: snap.id,
+      nickname: normalizeNickname(data.nickname) || '익명',
+      score: normalizeScore(data.score),
+      elapsedMs: Number.isFinite(data.elapsedMs) ? Math.max(0, Math.floor(data.elapsedMs)) : null,
+    };
+  }
+
   async function signOut() {
     init();
     await auth.signOut();
@@ -169,5 +257,9 @@
     },
     signOut,
     getAnalytics: () => analytics,
+    waitForAuthReady,
+    upsertInfiniteRanking,
+    getInfiniteRanking,
+    getMyInfiniteRanking,
   };
 })();

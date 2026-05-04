@@ -131,6 +131,24 @@
     infiniteAbandonBtn.textContent = '[중도 포기]';
     infiniteSelectPanel.appendChild(infiniteAbandonBtn);
 
+    const rankingPanel = document.createElement('div');
+    rankingPanel.className = 'infinite-ranking-panel';
+    rankingPanel.innerHTML = `
+      <div class="ranking-head">
+        <h4 class="ranking-title">랭킹</h4>
+        <p id="ranking-my-status" class="ranking-my-status">로그인 후 기록을 등록할 수 있습니다.</p>
+      </div>
+      <div class="ranking-nickname-row">
+        <input id="ranking-nickname-input" class="ranking-nickname-input" type="text" maxlength="20" placeholder="닉네임 입력" aria-label="닉네임">
+        <button id="ranking-submit-btn" class="panel-button secondary ranking-submit-btn" type="button">내 기록 등록/갱신</button>
+      </div>
+      <div class="ranking-auth-row">
+        <button id="ranking-logout-btn" class="ranking-logout-btn" type="button">로그아웃</button>
+      </div>
+      <ol id="ranking-list" class="ranking-list"></ol>
+    `;
+    infiniteSelectPanel.appendChild(rankingPanel);
+
     function renderInfiniteBestHud() {
       const record = infiniteBestRecord ?? readInfiniteBestRecord();
       const score = numberOr(record?.score, 0);
@@ -153,12 +171,18 @@
     const infiniteNewBtn = infiniteSelectPanel.querySelector('#infinite-new-btn');
     const infiniteContinueBtn = infiniteSelectPanel.querySelector('#infinite-continue-btn');
     const stageClearRewardValue = stageClearPopup.querySelector('#stage-clear-reward-value');
+    const rankingMyStatus = rankingPanel.querySelector('#ranking-my-status');
+    const rankingNicknameInput = rankingPanel.querySelector('#ranking-nickname-input');
+    const rankingSubmitBtn = rankingPanel.querySelector('#ranking-submit-btn');
+    const rankingLogoutBtn = rankingPanel.querySelector('#ranking-logout-btn');
+    const rankingList = rankingPanel.querySelector('#ranking-list');
     const stageClearConfirmBtn = stageClearPopup.querySelector('#stage-clear-confirm-btn');
     const abandonCancelBtn = abandonWarningPopup.querySelector('#abandon-cancel-btn');
     const abandonConfirmBtn = abandonWarningPopup.querySelector('#abandon-confirm-btn');
 
     let stageClearConfirmAction = null;
     let abandonConfirmAction = null;
+    let rankingSyncTimer = null;
 
     let actions = {
       onStartStageMode: () => setStatus('스테이지를 선택하세요.'),
@@ -270,6 +294,65 @@
       }
     }
 
+
+    async function refreshRanking() {
+      const auth = window.UpUpUpAuth;
+      if (!rankingList || !auth?.getInfiniteRanking) return;
+      rankingList.innerHTML = '<li class="ranking-empty">불러오는 중...</li>';
+      try {
+        const items = await auth.getInfiniteRanking(20);
+        if (!items.length) {
+          rankingList.innerHTML = '<li class="ranking-empty">아직 등록된 기록이 없습니다.</li>';
+          return;
+        }
+        rankingList.innerHTML = items.map((item) => (`<li class="ranking-item"><span>#${item.rank} ${item.nickname}</span><strong>${item.score}</strong></li>`)).join('');
+      } catch {
+        rankingList.innerHTML = '<li class="ranking-empty">랭킹을 불러오지 못했습니다.</li>';
+      }
+    }
+
+    async function syncMyRankingState() {
+      const auth = window.UpUpUpAuth;
+      const user = auth?.getUser?.();
+      if (!user) {
+        if (rankingMyStatus) rankingMyStatus.textContent = '로그인 후 기록을 등록할 수 있습니다.';
+        if (rankingLogoutBtn) rankingLogoutBtn.hidden = true;
+        return;
+      }
+      if (rankingLogoutBtn) rankingLogoutBtn.hidden = false;
+      try {
+        const mine = await auth.getMyInfiniteRanking();
+        if (rankingNicknameInput) rankingNicknameInput.value = mine?.nickname || user.displayName || '';
+        if (rankingMyStatus) rankingMyStatus.textContent = mine
+          ? `이미 등록됨 · 최고 ${numberOr(mine.score, 0)}점 (닉네임 변경 가능)`
+          : '아직 등록 전 · 처음 등록 후에는 갱신만 가능합니다.';
+      } catch {
+        if (rankingMyStatus) rankingMyStatus.textContent = '내 랭킹 상태를 불러오지 못했습니다.';
+      }
+    }
+
+    function scheduleRankingAutoSync() {
+      const auth = window.UpUpUpAuth;
+      const user = auth?.getUser?.();
+      if (!user) return;
+      if (rankingSyncTimer) clearTimeout(rankingSyncTimer);
+      rankingSyncTimer = setTimeout(async () => {
+        const record = readInfiniteBestRecord();
+        const nickname = rankingNicknameInput?.value?.trim() || user.displayName || '익명';
+        try {
+          await auth.upsertInfiniteRanking({
+            nickname,
+            score: numberOr(record?.score, 0),
+            elapsedMs: Number.isFinite(record?.elapsedMs) ? record.elapsedMs : null,
+          });
+          await refreshRanking();
+          await syncMyRankingState();
+        } catch {
+          // ignore background sync failures
+        }
+      }, 1200);
+    }
+
     function setGameView(view) {
       gameView = view === 'stages' || view === 'infinite' ? view : 'modes';
       const showModes = gameView === 'modes';
@@ -302,6 +385,8 @@
       }
 
       if (showInfinite) {
+        refreshRanking();
+        syncMyRankingState();
         infiniteBestRecord = readInfiniteBestRecord();
         renderInfiniteBestHud();
         bestScoreHud.classList.remove('is-game-hud');
@@ -469,6 +554,51 @@
         audio?.playStartSwoosh?.();
         actions.onContinueInfinite?.();
       });
+
+      rankingSubmitBtn?.addEventListener('click', async () => {
+        const auth = window.UpUpUpAuth;
+        const user = auth?.getUser?.();
+        if (!user) {
+          setStatus('로그인이 필요합니다.');
+          return;
+        }
+
+        const record = readInfiniteBestRecord();
+        const nickname = rankingNicknameInput?.value?.trim();
+        if (!nickname) {
+          setStatus('닉네임을 입력해 주세요.');
+          return;
+        }
+
+        rankingSubmitBtn.disabled = true;
+        try {
+          await auth.upsertInfiniteRanking({
+            nickname,
+            score: numberOr(record?.score, 0),
+            elapsedMs: Number.isFinite(record?.elapsedMs) ? record.elapsedMs : null,
+          });
+          setStatus('랭킹 기록을 등록/갱신했습니다.');
+          await syncMyRankingState();
+          await refreshRanking();
+        } catch {
+          setStatus('랭킹 등록에 실패했습니다.');
+        } finally {
+          rankingSubmitBtn.disabled = false;
+        }
+      });
+
+      rankingLogoutBtn?.addEventListener('click', async () => {
+        const auth = window.UpUpUpAuth;
+        try {
+          await auth?.signOut?.();
+          setStatus('로그아웃되었습니다.');
+          await syncMyRankingState();
+          await refreshRanking();
+        } catch {
+          setStatus('로그아웃에 실패했습니다.');
+        }
+      });
+      window.addEventListener('upupup:infinite-best-record-updated', scheduleRankingAutoSync);
 
       infiniteAbandonBtn?.addEventListener('click', () => {
         if (infiniteAbandonBtn.disabled) return;

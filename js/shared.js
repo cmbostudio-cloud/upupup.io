@@ -734,12 +734,14 @@
       writeJSONStorage(INFINITE_BEST_RECORD_KEY, normalized);
       writeJSONStorage(INFINITE_BEST_SCORE_KEY, normalized.score);
       cachedInfiniteBestRecord = deepFreeze(normalized);
+      window.dispatchEvent(new CustomEvent('upupup:infinite-best-record-updated', { detail: normalized }));
       return true;
     } catch {
       if (secureStorageSupported) {
         try {
           cachedInfiniteBestRecord = deepFreeze(normalized);
           writeJSONStorage(INFINITE_BEST_SCORE_KEY, normalized.score);
+          window.dispatchEvent(new CustomEvent('upupup:infinite-best-record-updated', { detail: normalized }));
           return true;
         } catch {
           return false;
