@@ -203,7 +203,7 @@ body {
     max(18px, env(safe-area-inset-bottom))
     max(18px, env(safe-area-inset-left));
   background: var(--bg-1);
-  touch-action: pan-y;
+  touch-action: auto;
 }
 
 #menu-overlay.is-stage-view,
