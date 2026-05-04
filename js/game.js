@@ -3,6 +3,7 @@ void (async () => {
   await ready;
 
   const shell = window.UpUpUpUI.createUIController();
+  const auth = window.UpUpUpAuth;
   const initialSave = storageReadSave();
   const audio = window.UpUpUpAudio?.createAudioManager?.(shell.getPreferences().audioVolume) ?? null;
   const canvas = document.getElementById('game-canvas');
@@ -25,7 +26,42 @@ void (async () => {
     });
   }
 
-  function startInfiniteMode() {
+  async function requireInfiniteAuth() {
+    if (!auth) {
+      shell.setStatus('인증 모듈을 찾을 수 없습니다.');
+      return false;
+    }
+
+    try {
+      const user = await auth.ensureSignedIn();
+      if (!user) {
+        shell.setStatus('로그인 페이지로 이동 중입니다...');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      const code = error?.code ?? '';
+      if (code.includes('popup-closed')) {
+        shell.setStatus('로그인이 취소되었습니다.');
+      } else if (code.includes('unauthorized-domain')) {
+        shell.setStatus('Firebase 인증 도메인이 설정되지 않았습니다. 관리자에게 문의하세요.');
+      } else if (code.includes('operation-not-allowed')) {
+        shell.setStatus('Firebase 콘솔에서 Google 로그인이 비활성화되어 있습니다.');
+      } else if (code.includes('network-request-failed')) {
+        shell.setStatus('네트워크 오류로 로그인에 실패했습니다.');
+      } else {
+        shell.setStatus('로그인에 실패했습니다. 다시 시도해 주세요.');
+      }
+
+      console.error('[InfiniteAuth] Google sign-in failed:', code, error);
+      return false;
+    }
+  }
+
+  async function startInfiniteMode() {
+    const passed = await requireInfiniteAuth();
+    if (!passed) return;
+
     shell.setStatus('무한 모드를 선택하세요.');
     shell.setGameView?.('infinite');
   }
@@ -35,7 +71,10 @@ void (async () => {
     shell.setGameView?.('stages');
   }
 
-  function startInfiniteNew() {
+  async function startInfiniteNew() {
+    const passed = await requireInfiniteAuth();
+    if (!passed) return;
+
     beginGame({
       mode: 'infinite',
       stage: 1,
@@ -43,7 +82,10 @@ void (async () => {
     });
   }
 
-  function continueInfinite() {
+  async function continueInfinite() {
+    const passed = await requireInfiniteAuth();
+    if (!passed) return;
+
     const latestSave = storageReadSave();
     const saved = latestSave && latestSave.mode === 'infinite'
       ? latestSave
