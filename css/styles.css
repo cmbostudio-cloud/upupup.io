@@ -47,6 +47,50 @@ body {
   touch-action: none;
 }
 
+.editor-access-btn {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  z-index: 80;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 140ms ease, color 140ms ease;
+  touch-action: manipulation;
+}
+
+.editor-access-btn:hover,
+.editor-access-btn:focus-visible {
+  transform: translateY(-1px);
+  color: rgba(21, 21, 21, 0.72);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.editor-access-btn:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+  .editor-access-btn {
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    font-size: 13px;
+    padding: 10px;
+  }
+}
+
 .game-exit-btn {
   position: fixed;
   top: max(14px, env(safe-area-inset-top));
@@ -159,6 +203,7 @@ body {
     max(18px, env(safe-area-inset-bottom))
     max(18px, env(safe-area-inset-left));
   background: var(--bg-1);
+  touch-action: auto;
 }
 
 #menu-overlay.is-stage-view,

@@ -13,6 +13,7 @@
 
   function createUIController() {
     const menuOverlay = document.getElementById('menu-overlay');
+    const editorAccessBtn = document.getElementById('editor-access-btn');
     const gamePanel = document.querySelector('[data-menu-panel="game"]');
     const menuCreditBalance = document.getElementById('menu-credit-balance');
     const menuPlayBtn = document.getElementById('menu-play-btn');
@@ -335,6 +336,9 @@
 
     function setMenuVisible(visible) {
       menuOverlay.style.display = visible ? 'flex' : 'none';
+      if (editorAccessBtn) {
+        editorAccessBtn.hidden = !visible;
+      }
       if (visible) {
         setActiveTab(activeTab);
         setGameView(gameView);
@@ -410,6 +414,16 @@
       setModeCardCopy();
       renderStageCards();
       setGameView('modes');
+
+      editorAccessBtn?.addEventListener('click', () => {
+        const password = window.prompt('에디터 비밀번호를 입력하세요.');
+        if (password === null) return;
+        if (password.trim() === 'teasung123') {
+          window.location.href = './editor/';
+          return;
+        }
+        window.alert('비밀번호가 일치하지 않습니다.');
+      });
 
       menuPlayBtn?.addEventListener('click', () => {
         const audio = window.UpUpUpAudio?.getAudioManager?.();
