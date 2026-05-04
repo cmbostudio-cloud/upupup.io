@@ -1149,3 +1149,65 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2200;
+}
+
+.auth-card {
+  width: min(92vw, 520px);
+  border: 2px solid #111;
+  padding: 24px;
+  color: #111;
+  background: #fff;
+}
+
+.auth-title {
+  font-size: 38px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+.auth-desc {
+  margin: 0 0 16px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.auth-mode-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.auth-mode-btn,
+.auth-line-btn {
+  width: 100%;
+  border: 1px solid #111;
+  background: #fff;
+  color: #111;
+  padding: 12px;
+  font-size: 18px;
+}
+
+.auth-mode-btn.is-active {
+  text-decoration: underline;
+}
+
+.auth-hint {
+  margin: 8px 0;
+  min-height: 20px;
+  font-size: 14px;
+}
+
+.auth-cancel-btn {
+  margin-top: 10px;
+}
