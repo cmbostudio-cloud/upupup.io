@@ -1153,12 +1153,12 @@ body {
 .auth-screen {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 50% 20%, rgba(28, 34, 52, 0.95), rgba(8, 10, 16, 0.98));
+  background: #f3efe6;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2200;
-  color: #e8edff;
+  z-index: 99999;
+  color: #2a3c4d;
   font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
 }
 
@@ -1182,7 +1182,7 @@ body {
   font-size: 18px;
   line-height: 1.55;
   text-align: center;
-  color: #b8c3e6;
+  color: #3f5568;
 }
 
 .auth-mode-row {
@@ -1196,10 +1196,10 @@ body {
 .auth-line-btn {
   width: 100%;
   border: none;
-  border-top: 1px solid rgba(170, 185, 232, 0.75);
-  border-bottom: 1px solid rgba(170, 185, 232, 0.75);
+  border-top: 1px solid #5f7281;
+  border-bottom: 1px solid #5f7281;
   background: transparent;
-  color: #e8edff;
+  color: #2a3c4d;
   padding: 13px 10px;
   font-size: 19px;
   font-weight: 600;
@@ -1212,7 +1212,7 @@ body {
 }
 
 .auth-mode-btn.is-active {
-  color: #9db6ff;
+  color: #1f2c38;
 }
 
 .auth-hint {
@@ -1220,7 +1220,7 @@ body {
   min-height: 22px;
   font-size: 14px;
   text-align: center;
-  color: #8fa5df;
+  color: #3f5568;
 }
 
 .auth-cancel-btn {
