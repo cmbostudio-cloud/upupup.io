@@ -33,16 +33,16 @@ void (async () => {
     }
 
     try {
-      const user = await auth.ensureSignedIn();
+      const user = await auth.promptAuthGate();
       if (!user) {
-        shell.setStatus('로그인 페이지로 이동 중입니다...');
+        shell.setStatus('로그인이 필요합니다.');
         return false;
       }
       return true;
     } catch (error) {
       const code = error?.code ?? '';
-      if (code.includes('popup-closed')) {
-        shell.setStatus('로그인이 취소되었습니다.');
+      if ((error?.message ?? '').includes('auth-cancelled-by-user') || code.includes('popup-closed')) {
+        shell.setStatus('로그인/회원가입이 취소되었습니다.');
       } else if (code.includes('unauthorized-domain')) {
         shell.setStatus('Firebase 인증 도메인이 설정되지 않았습니다. 관리자에게 문의하세요.');
       } else if (code.includes('operation-not-allowed')) {
