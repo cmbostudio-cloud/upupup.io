@@ -17,19 +17,12 @@
 
   function init() {
     if (app) return;
-    if (!window.firebase || !window.firebase.auth) {
-      throw new Error('Firebase SDK not loaded');
-    }
+    if (!window.firebase || !window.firebase.auth) throw new Error('Firebase SDK not loaded');
 
-    app = window.firebase.apps.length
-      ? window.firebase.app()
-      : window.firebase.initializeApp(firebaseConfig);
+    app = window.firebase.apps.length ? window.firebase.app() : window.firebase.initializeApp(firebaseConfig);
     auth = window.firebase.auth();
     googleProvider = new window.firebase.auth.GoogleAuthProvider();
-
-    if (window.firebase.analytics) {
-      analytics = window.firebase.analytics();
-    }
+    if (window.firebase.analytics) analytics = window.firebase.analytics();
   }
 
   function ensureAuthModal() {
@@ -48,13 +41,7 @@
           <button class="auth-tab" data-auth-tab="signup" aria-selected="false" type="button">회원가입</button>
         </div>
 
-        <div class="auth-panel" data-auth-panel="login">
-          <button class="auth-google-btn" data-auth-action="login" type="button">Google로 로그인</button>
-        </div>
-        <div class="auth-panel" data-auth-panel="signup" hidden>
-          <button class="auth-google-btn" data-auth-action="signup" type="button">Google로 회원가입</button>
-        </div>
-
+        <button class="auth-google-btn" data-auth-action="google" type="button">Google로 로그인</button>
         <p class="auth-hint" id="auth-hint" aria-live="polite"></p>
         <button class="auth-cancel-btn" type="button">취소</button>
       </div>
@@ -68,16 +55,10 @@
   function setAuthTab(tab) {
     if (!authModal) return;
     const tabs = authModal.querySelectorAll('[data-auth-tab]');
-    const panels = authModal.querySelectorAll('[data-auth-panel]');
-
     tabs.forEach((btn) => {
       const active = btn.dataset.authTab === tab;
       btn.classList.toggle('is-active', active);
       btn.setAttribute('aria-selected', String(active));
-    });
-
-    panels.forEach((panel) => {
-      panel.hidden = panel.dataset.authPanel !== tab;
     });
   }
 
@@ -96,9 +77,16 @@
     const hint = overlay.querySelector('#auth-hint');
     const cancelBtn = overlay.querySelector('.auth-cancel-btn');
     const tabButtons = Array.from(overlay.querySelectorAll('[data-auth-tab]'));
-    const actionButtons = Array.from(overlay.querySelectorAll('[data-auth-action]'));
+    const googleButton = overlay.querySelector('[data-auth-action="google"]');
 
-    setAuthTab('login');
+    let currentTab = 'login';
+    const updateGoogleLabel = () => {
+      if (!googleButton) return;
+      googleButton.textContent = currentTab === 'signup' ? 'Google로 회원가입' : 'Google로 로그인';
+    };
+
+    setAuthTab(currentTab);
+    updateGoogleLabel();
     hint.textContent = '';
     overlay.hidden = false;
 
@@ -106,64 +94,59 @@
       let done = false;
       const cleanups = [];
 
-      function cleanup() {
-        while (cleanups.length) {
-          const fn = cleanups.pop();
-          fn();
-        }
-      }
-
-      function finishOk(user) {
+      const cleanup = () => {
+        while (cleanups.length) cleanups.pop()();
+      };
+      const finishOk = (user) => {
         if (done) return;
         done = true;
         overlay.hidden = true;
         cleanup();
         resolve(user);
-      }
-
-      function finishErr(error) {
+      };
+      const finishErr = (error) => {
         if (done) return;
         done = true;
         overlay.hidden = true;
         cleanup();
         reject(error);
-      }
+      };
 
-      function onCancel() {
-        finishErr(new Error('auth-cancelled-by-user'));
-      }
-
+      const onCancel = () => finishErr(new Error('auth-cancelled-by-user'));
       cancelBtn.addEventListener('click', onCancel);
       cleanups.push(() => cancelBtn.removeEventListener('click', onCancel));
 
       for (const tabBtn of tabButtons) {
-        const handler = () => setAuthTab(tabBtn.dataset.authTab);
+        const handler = () => {
+          currentTab = tabBtn.dataset.authTab;
+          setAuthTab(currentTab);
+          updateGoogleLabel();
+        };
         tabBtn.addEventListener('click', handler);
         cleanups.push(() => tabBtn.removeEventListener('click', handler));
       }
 
-      for (const actionBtn of actionButtons) {
-        const handler = async () => {
-          hint.textContent = 'Google 인증 창을 여는 중입니다...';
-          try {
-            const user = await ensureSignedIn();
-            finishOk(user);
-          } catch (error) {
-            const code = error?.code ?? '';
-            if (code.includes('popup-closed')) {
-              hint.textContent = '인증 창이 닫혔습니다. 다시 시도해 주세요.';
-              return;
-            }
-            if (code.includes('unauthorized-domain')) {
-              hint.textContent = '인증 도메인 설정이 필요합니다.';
-              return;
-            }
-            hint.textContent = '로그인/회원가입 실패. 다시 시도해 주세요.';
+      const onGoogle = async () => {
+        hint.textContent = 'Google 인증 창을 여는 중입니다...';
+        try {
+          const user = await ensureSignedIn();
+          finishOk(user);
+        } catch (error) {
+          const code = error?.code ?? '';
+          if (code.includes('popup-closed')) {
+            hint.textContent = '인증 창이 닫혔습니다. 다시 시도해 주세요.';
+            return;
           }
-        };
-        actionBtn.addEventListener('click', handler);
-        cleanups.push(() => actionBtn.removeEventListener('click', handler));
-      }
+          if (code.includes('unauthorized-domain')) {
+            hint.textContent = '인증 도메인 설정이 필요합니다.';
+            return;
+          }
+          hint.textContent = '로그인/회원가입 실패. 다시 시도해 주세요.';
+        }
+      };
+
+      googleButton?.addEventListener('click', onGoogle);
+      cleanups.push(() => googleButton?.removeEventListener('click', onGoogle));
     });
   }
 

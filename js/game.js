@@ -43,6 +43,7 @@ void (async () => {
       const code = error?.code ?? '';
       if ((error?.message ?? '').includes('auth-cancelled-by-user') || code.includes('popup-closed')) {
         shell.setStatus('로그인/회원가입이 취소되었습니다.');
+        shell.setGameView?.('modes');
       } else if (code.includes('unauthorized-domain')) {
         shell.setStatus('Firebase 인증 도메인이 설정되지 않았습니다. 관리자에게 문의하세요.');
       } else if (code.includes('operation-not-allowed')) {
