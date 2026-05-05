@@ -19,6 +19,7 @@
     writeStartMode,
     readStageEditorStage,
     unlockStage,
+    getThemePalette,
   } = window.UpUpUpShared;
 
   function startGame({ canvas, shell, initialSave, audio, mode = 'infinite', stage = 1 }) {
@@ -143,11 +144,14 @@
     let runPaused = false;
     let bestRecord = { score: 0, elapsedMs: null, savedAt: 0 };
 
+    const currentTheme = shell.getPreferences?.().currentTheme;
+    const themePalette = getThemePalette?.(currentTheme) ?? {};
+
     const app = new PIXI.Application({
       view: canvas,
       width: CANVAS_W,
       height: CANVAS_H,
-      backgroundColor: 0xf5f1e8,
+      backgroundColor: themePalette.background ?? 0xf5f1e8,
       antialias: !IS_TOUCH_DEVICE,
       resolution: PIXEL_RATIO,
       autoDensity: true,
@@ -177,6 +181,7 @@
       collectedCreditIds: initialCollectedCreditIds,
       collectedStarIds: initialSave?.map?.collectedStarIds ?? [],
       collectedPortalIds: initialSave?.map?.collectedPortalIds ?? [],
+      theme: themePalette,
     });
 
     const stageCollectibles = gameMode === 'stage' ? (map.stars ?? map.portals ?? []) : [];
@@ -614,6 +619,7 @@
         MAX_PULL,
         PLAYER_RADIUS,
         PLAYER_BORDER,
+        theme: themePalette,
       },
       initialSaveForGame?.player?.x ?? DEFAULT_PLAYER_X,
       initialSaveForGame?.player?.y ?? GROUND_Y - 44
@@ -647,7 +653,7 @@
     scoreText = new PIXI.Text('0', {
       fontFamily: 'Courier New',
       fontSize: 42,
-      fill: 0x111111,
+      fill: themePalette.ink ?? 0x111111,
       fontWeight: '900',
     });
     scoreText.anchor.set(0.5, 0);
@@ -656,7 +662,7 @@
     multiplierText = new PIXI.Text('x1', {
       fontFamily: 'Courier New',
       fontSize: 16,
-      fill: 0x1a1a1a,
+      fill: themePalette.inkSoft ?? 0x1a1a1a,
       fontWeight: '700',
     });
     multiplierText.anchor.set(0.5, 0);
@@ -665,7 +671,7 @@
       modeText = new PIXI.Text(`스테이지 ${gameStage}`, {
         fontFamily: 'Courier New',
         fontSize: 16,
-        fill: 0x1a1a1a,
+        fill: themePalette.inkSoft ?? 0x1a1a1a,
         fontWeight: '700',
       });
       modeText.anchor.set(0, 0);
@@ -676,7 +682,7 @@
       stageStarText = new PIXI.Text('별: 0/3', {
         fontFamily: 'Courier New',
         fontSize: 20,
-        fill: 0x1a1a1a,
+        fill: themePalette.inkSoft ?? 0x1a1a1a,
         fontWeight: '700',
       });
       stageStarText.anchor.set(0, 0);

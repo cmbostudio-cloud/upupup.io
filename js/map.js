@@ -24,7 +24,20 @@
     collectedCreditIds = [],
     collectedStarIds = [],
     collectedPortalIds = [],
+    theme = {},
   }) {
+    const colors = {
+      ink: 0x111111,
+      inkSoft: 0x1a1a1a,
+      ground: 0x7b6d5e,
+      grid: 0xd8d2c6,
+      stickHighlight: 0xffffff,
+      creditFill: 0xffdb4d,
+      creditHighlight: 0xfff6a6,
+      starFill: 0xd4af37,
+      starBorder: 0x5d4300,
+      ...theme,
+    };
     const rng = createRng(seed);
     const toIdKey = (value) => String(value);
     const collectedCreditIdSet = new Set(collectedCreditIds.map(toIdKey));
@@ -40,13 +53,13 @@
     world.addChild(grid);
 
     const groundLine = new PIXI.Graphics();
-    groundLine.lineStyle(4, 0x7b6d5e, 1);
+    groundLine.lineStyle(4, colors.ground, 1);
     groundLine.moveTo(0, GROUND_Y);
     groundLine.lineTo(MAP_W, GROUND_Y);
     world.addChild(groundLine);
 
     const wallFrame = new PIXI.Graphics();
-    wallFrame.lineStyle(6, 0x1a1a1a, 1);
+    wallFrame.lineStyle(6, colors.inkSoft, 1);
     wallFrame.moveTo(0, -10000000);
     wallFrame.lineTo(0, 10000000);
     wallFrame.moveTo(MAP_W, -10000000);
@@ -132,10 +145,10 @@
     }
 
     function drawStickShape(stick, x, y, width, height, capRadius) {
-      stick.beginFill(0x111111);
+      stick.beginFill(colors.ink);
       stick.drawRoundedRect(x, y, width, height, capRadius);
       stick.endFill();
-      stick.beginFill(0xffffff, 0.08);
+      stick.beginFill(colors.stickHighlight, 0.08);
       stick.drawRoundedRect(
         x + 4,
         y + 4,
@@ -148,8 +161,8 @@
 
     function drawCreditShape(credit, halfSize) {
       const innerSize = Math.max(2, Math.round(halfSize * 0.58));
-      credit.lineStyle(3, 0x111111, 1);
-      credit.beginFill(0xffdb4d);
+      credit.lineStyle(3, colors.ink, 1);
+      credit.beginFill(colors.creditFill);
       credit.drawPolygon([
         0,
         -halfSize,
@@ -162,7 +175,7 @@
       ]);
       credit.endFill();
       credit.lineStyle(0);
-      credit.beginFill(0xfff6a6, 0.9);
+      credit.beginFill(colors.creditHighlight, 0.9);
       credit.drawPolygon([
         0,
         -innerSize,
@@ -197,8 +210,8 @@
 
       const starOuter = radius * 0.92;
       const starInner = radius * 0.44;
-      const starFill = 0xd4af37;
-      const starBorder = 0x5d4300;
+      const starFill = colors.starFill;
+      const starBorder = colors.starBorder;
       const borderWidth = Math.max(2, Math.round(radius * 0.2));
 
       const star = new PIXI.Graphics();
@@ -618,7 +631,7 @@
       blades.x = spawnX;
       blades.y = centerY;
 
-      const bladeStyle = 0x111111;
+      const bladeStyle = colors.ink;
       const bladeOffsets = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
       for (const offset of bladeOffsets) {
         const blade = new PIXI.Graphics();
@@ -636,7 +649,7 @@
       }
 
       const hub = new PIXI.Graphics();
-      hub.beginFill(0x111111);
+      hub.beginFill(colors.ink);
       hub.drawCircle(0, 0, hubRadius);
       hub.endFill();
       blades.addChild(hub);
@@ -1066,7 +1079,7 @@
       const top = Math.floor((cameraTop - GRID * 2) / GRID) * GRID;
       const bottom = Math.ceil((cameraBottom + GRID * 2) / GRID) * GRID;
 
-      grid.lineStyle(1, 0xd8d2c6, 0.7);
+      grid.lineStyle(1, colors.grid, 0.7);
       for (let x = 0; x <= MAP_W; x += GRID) {
         grid.moveTo(x, top);
         grid.lineTo(x, bottom);

@@ -79,8 +79,8 @@
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
     let audioVolume = prefs.audioVolume;
-    let ownedThemes = Array.isArray(prefs.ownedThemes) ? prefs.ownedThemes : ['light'];
-    let currentTheme = typeof prefs.currentTheme === 'string' ? prefs.currentTheme : 'light';
+    let ownedThemes = Array.isArray(prefs.ownedThemes) ? prefs.ownedThemes : ['default'];
+    let currentTheme = typeof prefs.currentTheme === 'string' ? prefs.currentTheme : 'default';
     let creditBalance = 0;
     let activeTab = 'game';
     let gameView = 'modes';
@@ -787,7 +787,7 @@
 
     return {
       getPreferences() {
-        return { autoSaveEnabled, gridVisible, audioVolume };
+        return { autoSaveEnabled, gridVisible, audioVolume, currentTheme, ownedThemes: [...ownedThemes] };
       },
       setActions,
       setStatus,

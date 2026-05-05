@@ -322,10 +322,10 @@
 
     drawSquare() {
       this.gfx.clear();
-      this.gfx.beginFill(0x1a1a1a);
+      this.gfx.beginFill(this.ctx.theme?.inkSoft ?? 0x1a1a1a);
       this.gfx.drawRoundedRect(0, 0, this.size, this.size, this.ctx.PLAYER_RADIUS);
       this.gfx.endFill();
-      this.gfx.beginFill(this.color);
+      this.gfx.beginFill(this.ctx.theme?.playerFill ?? this.color);
       this.gfx.drawRoundedRect(
         this.ctx.PLAYER_BORDER,
         this.ctx.PLAYER_BORDER,
@@ -356,7 +356,7 @@
         const dy = cy + (py - cy) * t;
         const r = 3.5 - t * 1.5;
         const alpha = 0.9 - t * 0.55;
-        this.ctx.dotLayer.beginFill(0x1a1a1a, alpha);
+        this.ctx.dotLayer.beginFill(this.ctx.theme?.inkSoft ?? 0x1a1a1a, alpha);
         this.ctx.dotLayer.drawCircle(dx, dy, Math.max(r, 1));
         this.ctx.dotLayer.endFill();
       }
