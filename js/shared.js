@@ -14,6 +14,47 @@
   const THEME_SHOP_VERSION = 2;
   const AVAILABLE_THEMES = ['default', 'light', 'dark'];
   const DEFAULT_THEME = 'default';
+  const THEME_PALETTES = {
+    default: {
+      background: 0xf5f1e8,
+      ink: 0x151515,
+      inkSoft: 0x1a1a1a,
+      ground: 0x7b6d5e,
+      grid: 0xd8d2c6,
+      playerFill: 0xffffff,
+      stickHighlight: 0xffffff,
+      creditFill: 0xffdb4d,
+      creditHighlight: 0xfff6a6,
+      starFill: 0xd4af37,
+      starBorder: 0x5d4300,
+    },
+    light: {
+      background: 0xf8fbff,
+      ink: 0x141820,
+      inkSoft: 0x263142,
+      ground: 0x8fa0b3,
+      grid: 0xd9e2ee,
+      playerFill: 0xffffff,
+      stickHighlight: 0xffffff,
+      creditFill: 0xffdb4d,
+      creditHighlight: 0xfff6a6,
+      starFill: 0xd4af37,
+      starBorder: 0x5d4300,
+    },
+    dark: {
+      background: 0x0f131b,
+      ink: 0xe7ebf4,
+      inkSoft: 0xcfd7e6,
+      ground: 0x62708a,
+      grid: 0x2d3646,
+      playerFill: 0x13161d,
+      stickHighlight: 0xffffff,
+      creditFill: 0x5fc8ff,
+      creditHighlight: 0x9be4ff,
+      starFill: 0xffd166,
+      starBorder: 0x7a5a00,
+    },
+  };
   const STAGE_EDITOR_DRAFT_KEY = 'upupup.stage-editor.draft.v1';
   const STAGE_EDITOR_STAGE_PREFIX = 'upupup.stage-editor.stage.v1.';
   const REMOVED_LOCAL_STORAGE_KEYS = [
@@ -129,6 +170,11 @@
     const themeId = String(value || DEFAULT_THEME);
     if (migrateLegacyLight && themeId === 'light') return DEFAULT_THEME;
     return AVAILABLE_THEMES.includes(themeId) ? themeId : DEFAULT_THEME;
+  }
+
+  function getThemePalette(themeId) {
+    const normalizedThemeId = normalizeThemeId(themeId);
+    return { ...THEME_PALETTES[DEFAULT_THEME], ...THEME_PALETTES[normalizedThemeId] };
   }
 
   function normalizeThemeShop(raw) {
@@ -865,6 +911,7 @@
     writePrefs,
     readThemeShop,
     writeThemeShop,
+    getThemePalette,
     formatTime,
     formatDuration,
     numberOr,
