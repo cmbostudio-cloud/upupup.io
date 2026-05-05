@@ -1,6 +1,6 @@
 (() => {
   const firebaseConfig = {
-    apiKey: 'AIzaSyBCeHx5RAPQZSN_D-E8wPqIqv-JDv4rpnU',
+    apiKey: 'AIzaSyDo8hYz80qYKTrJBLFyPHRrS_Rvx6XPZWQ',
     authDomain: 'upupupio.firebaseapp.com',
     projectId: 'upupupio',
     storageBucket: 'upupupio.firebasestorage.app',
