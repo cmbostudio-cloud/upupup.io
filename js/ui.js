@@ -8,6 +8,8 @@
     writePrefs,
     writeThemeShop,
     storageReadSave,
+    storageWriteSave,
+    storageListSaves,
     hasStageEditorStage,
     getUnlockedStageLimit,
     writeCreditBalance,
@@ -26,6 +28,8 @@
     const gridToggleBtn = document.getElementById('grid-toggle-btn');
     const audioVolumeSlider = document.getElementById('audio-volume-slider');
     const audioVolumeValue = document.getElementById('audio-volume-value');
+    const saveSlotControls = document.getElementById('save-slot-controls');
+    const menuLogoutBtn = document.getElementById('menu-logout-btn');
     const saveStatus = document.getElementById('save-status');
     const shopThemeGrid = document.getElementById('shop-theme-grid');
     const shopThemeStatus = document.getElementById('shop-theme-status');
@@ -149,9 +153,6 @@
         <input id="ranking-nickname-input" class="ranking-nickname-input" type="text" maxlength="20" placeholder="닉네임 입력" aria-label="닉네임">
         <button id="ranking-submit-btn" class="panel-button secondary ranking-submit-btn" type="button">내 기록 등록/갱신</button>
       </div>
-      <div class="ranking-auth-row">
-        <button id="ranking-logout-btn" class="ranking-logout-btn" type="button">로그아웃</button>
-      </div>
       <ol id="ranking-list" class="ranking-list"></ol>
     `;
     infiniteSelectPanel.appendChild(rankingPanel);
@@ -181,7 +182,6 @@
     const rankingMyStatus = rankingPanel.querySelector('#ranking-my-status');
     const rankingNicknameInput = rankingPanel.querySelector('#ranking-nickname-input');
     const rankingSubmitBtn = rankingPanel.querySelector('#ranking-submit-btn');
-    const rankingLogoutBtn = rankingPanel.querySelector('#ranking-logout-btn');
     const rankingList = rankingPanel.querySelector('#ranking-list');
     const stageClearConfirmBtn = stageClearPopup.querySelector('#stage-clear-confirm-btn');
     const abandonCancelBtn = abandonWarningPopup.querySelector('#abandon-cancel-btn');
@@ -212,6 +212,41 @@
       if (saveStatus) {
         saveStatus.textContent = message;
       }
+    }
+
+    async function manualSaveToSlot(slot) {
+      const current = storageReadSave();
+      if (!current) return setStatus(`저장할 진행이 없습니다. (슬롯 ${slot})`);
+      const ok = await storageWriteSave(current, slot);
+      setStatus(ok ? `슬롯 ${slot}에 저장했습니다.` : `슬롯 ${slot} 저장에 실패했습니다.`);
+      renderSaveSlots();
+    }
+
+    function loadFromSlot(slot) {
+      const save = storageReadSave(slot);
+      if (!save) return setStatus(`슬롯 ${slot}에 저장된 진행이 없습니다.`);
+      const restored = storageReadSave();
+      if (!restored || restored.savedAt !== save.savedAt) {
+        storageWriteSave(save, 1).then(() => {
+          updateMenuState(save);
+          setCreditBalance(save?.credits);
+          setStatus(`슬롯 ${slot} 불러오기 완료.`);
+        });
+      }
+    }
+
+    function renderSaveSlots() {
+      if (!saveSlotControls) return;
+      const slots = storageListSaves?.() ?? [];
+      saveSlotControls.innerHTML = slots.map(({ slot, save }) => `
+        <div class="save-slot-row">
+          <span class="panel-button-title">세이브 슬롯 ${slot}</span>
+          <span class="panel-button-desc">${save ? `${formatTime(save.savedAt ?? Date.now())} | 점수 ${numberOr(save.score, 0)}` : '비어 있음'}</span>
+          <div class="save-slot-actions">
+            <button class="panel-button secondary" type="button" data-save-slot="${slot}" data-save-action="save">저장</button>
+            <button class="panel-button secondary" type="button" data-save-slot="${slot}" data-save-action="load" ${save ? '' : 'disabled'}>불러오기</button>
+          </div>
+        </div>`).join('');
     }
 
     function applyTheme(themeName) {
@@ -695,7 +730,7 @@
         }
       });
 
-      rankingLogoutBtn?.addEventListener('click', async () => {
+      menuLogoutBtn?.addEventListener('click', async () => {
         const auth = window.UpUpUpAuth;
         try {
           await auth?.signOut?.();
@@ -705,6 +740,15 @@
         } catch {
           setStatus('로그아웃에 실패했습니다.');
         }
+      });
+
+      saveSlotControls?.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-save-slot]');
+        if (!btn) return;
+        const slot = Number(btn.dataset.saveSlot);
+        const action = btn.dataset.saveAction;
+        if (action === 'save') manualSaveToSlot(slot);
+        if (action === 'load') loadFromSlot(slot);
       });
       window.addEventListener('upupup:infinite-best-record-updated', scheduleRankingAutoSync);
       window.addEventListener('beforeunload', () => {
@@ -784,6 +828,7 @@
     setAutosaveEnabled(autoSaveEnabled);
     syncAudioVolumeUI();
     renderThemeShop();
+    renderSaveSlots();
 
     return {
       getPreferences() {

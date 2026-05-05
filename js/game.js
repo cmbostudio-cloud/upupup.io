@@ -141,5 +141,14 @@ void (async () => {
     },
   });
 
+  shell.setMenuVisible(false);
+  if (auth?.promptAuthGate) {
+    try {
+      await auth.promptAuthGate();
+      shell.setStatus('로그인되었습니다.');
+    } catch {
+      shell.setStatus('로그인 후 이용할 수 있습니다.');
+    }
+  }
   shell.setMenuVisible(true);
 })();

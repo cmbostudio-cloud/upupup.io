@@ -1,5 +1,7 @@
 (() => {
   const SAVE_KEY = 'upupup.io.save.v1';
+  const SAVE_SLOT_PREFIX = 'upupup.io.save.slot.v1.';
+  const SAVE_SLOT_COUNT = 3;
   const PREFS_KEY = 'upupup.io.prefs.v1';
   const SAVE_SECRET = 'upupup.io::save::v1::9f3c';
   const SAVE_VERSION = 1;
@@ -598,9 +600,14 @@
     }
   }
 
-  function readLegacySave() {
+  function getSaveKeyBySlot(slot = 1) {
+    const normalizedSlot = Math.max(1, Math.min(SAVE_SLOT_COUNT, Math.floor(Number(slot) || 1)));
+    return normalizedSlot === 1 ? SAVE_KEY : `${SAVE_SLOT_PREFIX}${normalizedSlot}`;
+  }
+
+  function readLegacySave(slot = 1) {
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
+      const raw = localStorage.getItem(getSaveKeyBySlot(slot));
       if (!raw) return null;
       return decodeSave(raw);
     } catch {
@@ -608,8 +615,8 @@
     }
   }
 
-  function writeLegacySave(data) {
-    localStorage.setItem(SAVE_KEY, encodeSave(data));
+  function writeLegacySave(data, slot = 1) {
+    localStorage.setItem(getSaveKeyBySlot(slot), encodeSave(data));
   }
 
   function readLegacyInfiniteBestRecord() {
@@ -712,21 +719,21 @@
 
   const ready = loadSecureCache();
 
-  function storageReadSave() {
+  function storageReadSave(slot = 1) {
     if (readJSONStorage(SAVE_TOMBSTONE_KEY)) {
       return null;
     }
-    if (secureStorageReady && cachedSave) {
+    if (slot === 1 && secureStorageReady && cachedSave) {
       return cachedSave;
     }
-    return normalizeSaveData(readLegacySave());
+    return normalizeSaveData(readLegacySave(slot));
   }
 
-  async function storageWriteSave(data) {
+  async function storageWriteSave(data, slot = 1) {
     const normalized = normalizeSaveData(data);
     if (!normalized) return false;
 
-    if (secureStorageSupported) {
+    if (slot === 1 && secureStorageSupported) {
       try {
         const record = await encryptRecord(SECURE_SAVE_RECORD, normalized);
         await writeSecureRecord(SECURE_SAVE_RECORD, record);
@@ -736,14 +743,14 @@
     }
 
     try {
-      writeLegacySave(normalized);
-      cachedSave = deepFreeze(normalized);
+      writeLegacySave(normalized, slot);
+      if (slot === 1) cachedSave = deepFreeze(normalized);
       writeJSONStorage(SAVE_TOMBSTONE_KEY, false);
       return true;
     } catch {
       if (secureStorageSupported) {
         try {
-          cachedSave = deepFreeze(normalized);
+          if (slot === 1) cachedSave = deepFreeze(normalized);
           writeJSONStorage(SAVE_TOMBSTONE_KEY, false);
           return true;
         } catch {
@@ -855,15 +862,22 @@
     return true;
   }
 
-  function storageDeleteSave() {
+  function storageDeleteSave(slot = 1) {
     try {
-      writeLegacySave(null);
+      writeLegacySave(null, slot);
       writeJSONStorage(SAVE_TOMBSTONE_KEY, true);
-      cachedSave = null;
+      if (slot === 1) cachedSave = null;
       return true;
     } catch {
       return false;
     }
+  }
+
+  function storageListSaves() {
+    return Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => {
+      const slot = i + 1;
+      return { slot, save: storageReadSave(slot) };
+    });
   }
 
   function readInfiniteBestScore() {
@@ -921,6 +935,7 @@
     storageReadSave,
     storageWriteSave,
     storageDeleteSave,
+    storageListSaves,
     readInfiniteBestRecord,
     readInfiniteBestScore,
     writeInfiniteBestRecord,
