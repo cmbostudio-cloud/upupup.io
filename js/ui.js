@@ -6,9 +6,11 @@
     readPrefs,
     readInfiniteBestRecord,
     writePrefs,
+    writeThemeShop,
     storageReadSave,
     hasStageEditorStage,
     getUnlockedStageLimit,
+    writeCreditBalance,
   } = window.UpUpUpShared;
 
   function createUIController() {
@@ -25,6 +27,8 @@
     const audioVolumeSlider = document.getElementById('audio-volume-slider');
     const audioVolumeValue = document.getElementById('audio-volume-value');
     const saveStatus = document.getElementById('save-status');
+    const shopThemeGrid = document.getElementById('shop-theme-grid');
+    const shopThemeStatus = document.getElementById('shop-theme-status');
     const gameTitle = gamePanel?.querySelector('.menu-title');
     const menuActions = gamePanel?.querySelector('.menu-actions');
     const bestScoreHud = (() => {
@@ -75,6 +79,9 @@
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
     let audioVolume = prefs.audioVolume;
+    let ownedThemes = Array.isArray(prefs.ownedThemes) ? prefs.ownedThemes : ['light'];
+    let currentTheme = typeof prefs.currentTheme === 'string' ? prefs.currentTheme : 'light';
+    let creditBalance = 0;
     let activeTab = 'game';
     let gameView = 'modes';
     let infiniteBestRecord = readInfiniteBestRecord();
@@ -205,6 +212,57 @@
       if (saveStatus) {
         saveStatus.textContent = message;
       }
+    }
+
+    function applyTheme(themeName) {
+      currentTheme = themeName === 'dark' ? 'dark' : 'light';
+      document.body.dataset.theme = currentTheme;
+    }
+
+    const themeItems = [
+      { id: 'light', title: '라이트 테마', price: 0, desc: '기본 밝은 UI 테마입니다.' },
+      { id: 'dark', title: '다크 테마', price: 25, desc: '눈부심을 줄인 어두운 UI 테마입니다.' },
+    ];
+
+    function persistThemeShop() {
+      return writeThemeShop({ ownedThemes, currentTheme });
+    }
+
+    function renderThemeShop() {
+      if (!shopThemeGrid) return;
+      shopThemeGrid.innerHTML = themeItems.map((item) => {
+        const owned = ownedThemes.includes(item.id);
+        const active = currentTheme === item.id;
+        return `
+          <button class="panel-button secondary" type="button" data-theme-id="${item.id}" aria-pressed="${active}">
+            <span class="panel-button-title">${item.title}${active ? ' (적용 중)' : ''}</span>
+            <span class="panel-button-desc">${item.desc} · ${owned ? '보유' : `${item.price} 크레딧`}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function buyOrApplyTheme(themeId) {
+      const item = themeItems.find((entry) => entry.id === themeId);
+      if (!item) return;
+
+      if (!ownedThemes.includes(item.id)) {
+        if (creditBalance < item.price) {
+          if (shopThemeStatus) shopThemeStatus.textContent = `크레딧이 부족합니다. (${item.price} 필요)`;
+          return;
+        }
+        creditBalance -= item.price;
+        ownedThemes = Array.from(new Set([...ownedThemes, item.id]));
+        writeCreditBalance(creditBalance);
+        setCreditBalance(creditBalance);
+        if (shopThemeStatus) shopThemeStatus.textContent = `${item.title} 구매 완료!`;
+      } else if (shopThemeStatus) {
+        shopThemeStatus.textContent = `${item.title} 적용 완료!`;
+      }
+
+      applyTheme(item.id);
+      persistThemeShop();
+      renderThemeShop();
     }
 
     function hideStageClearPopup() {
@@ -455,9 +513,11 @@
     }
 
     function setCreditBalance(balance) {
+      creditBalance = numberOr(balance, 0);
       if (menuCreditBalance) {
-        menuCreditBalance.textContent = `보유 크레딧 ${numberOr(balance, 0)}`;
+        menuCreditBalance.textContent = `보유 크레딧 ${creditBalance}`;
       }
+      renderThemeShop();
     }
 
     function updateMenuState(saved) {
@@ -524,14 +584,36 @@
       renderStageCards();
       setGameView('modes');
 
-      editorAccessBtn?.addEventListener('click', () => {
-        const password = window.prompt('에디터 비밀번호를 입력하세요.');
-        if (password === null) return;
-        if (password.trim() === 'teasung123') {
-          window.location.href = './editor/';
+      shopThemeGrid?.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const themeButton = target?.closest('[data-theme-id]');
+        if (!themeButton || !shopThemeGrid.contains(themeButton)) return;
+        buyOrApplyTheme(themeButton.dataset.themeId);
+      });
+
+      editorAccessBtn?.addEventListener('click', async () => {
+        const auth = window.UpUpUpAuth;
+        if (!auth?.requireEditorAccess) {
+          window.alert('에디터 권한 확인 모듈을 찾을 수 없습니다.');
           return;
         }
-        window.alert('비밀번호가 일치하지 않습니다.');
+
+        editorAccessBtn.disabled = true;
+        editorAccessBtn.textContent = '[권한 확인 중]';
+        try {
+          await auth.requireEditorAccess();
+          window.location.href = './editor/';
+        } catch (error) {
+          const code = error?.code ?? '';
+          if (code.includes('editor-permission-denied')) {
+            window.alert('스테이지 에디터 권한이 없는 계정입니다. 관리자에게 권한을 요청하세요.');
+          } else {
+            window.alert('에디터 권한 확인에 실패했습니다. 다시 시도해 주세요.');
+          }
+        } finally {
+          editorAccessBtn.disabled = false;
+          editorAccessBtn.textContent = '[에디터 접근]';
+        }
       });
 
       menuPlayBtn?.addEventListener('click', () => {
@@ -688,6 +770,7 @@
 
     bind();
     setActiveTab(activeTab);
+    applyTheme(currentTheme);
 
     const savedState = storageReadSave();
     updateMenuState(savedState);
@@ -695,6 +778,7 @@
     setGridVisible(gridVisible);
     setAutosaveEnabled(autoSaveEnabled);
     syncAudioVolumeUI();
+    renderThemeShop();
 
     return {
       getPreferences() {

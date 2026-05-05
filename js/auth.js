@@ -11,6 +11,7 @@
 
   const LEADERBOARD_COLLECTION = 'infiniteLeaderboard';
   const LEADERBOARD_LIMIT = 20;
+  const EDITOR_ACCESS_CLAIMS = ['admin', 'editor', 'stageEditor'];
 
   let app = null;
   let auth = null;
@@ -170,6 +171,26 @@
     });
   }
 
+
+  async function hasEditorAccess(user = null) {
+    init();
+    const targetUser = user ?? auth.currentUser;
+    if (!targetUser?.getIdTokenResult) return false;
+
+    const tokenResult = await targetUser.getIdTokenResult(true);
+    const claims = tokenResult?.claims ?? {};
+    return EDITOR_ACCESS_CLAIMS.some((claimName) => claims[claimName] === true);
+  }
+
+  async function requireEditorAccess() {
+    const user = await ensureSignedIn();
+    if (await hasEditorAccess(user)) return user;
+
+    const error = new Error('editor-permission-denied');
+    error.code = 'editor-permission-denied';
+    throw error;
+  }
+
   function normalizeNickname(name) {
     return String(name ?? '').trim().slice(0, 20);
   }
@@ -273,6 +294,8 @@
     init,
     ensureSignedIn,
     promptAuthGate,
+    hasEditorAccess,
+    requireEditorAccess,
     getUser: () => {
       init();
       return auth.currentUser;
