@@ -49,6 +49,20 @@ body[data-theme="dark"] {
   --modal-surface: rgba(26, 31, 42, 0.96);
 }
 
+body[data-theme="dark"] {
+  --bg-1: #13161d;
+  --bg-2: #0b0e14;
+  --ink: #e7ebf4;
+  --surface: #1a1f2a;
+  --surface-strong: #252d3b;
+  --surface-muted: #1e2531;
+  --surface-selected: #334054;
+  --surface-hover: #2a3344;
+  --line: rgba(226, 234, 255, 0.8);
+  --credit-fill-1: #9be4ff;
+  --credit-fill-2: #5fc8ff;
+}
+
 * {
   margin: 0;
   padding: 0;
