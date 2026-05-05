@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>UPUPUP.io 스테이지 에디터</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./editor.css">
 </head>
-<body>
+<body class="is-editor-locked">
 <div class="editor-app">
   <header class="editor-topbar">
     <div class="editor-brand">
@@ -202,7 +203,12 @@
   </footer>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
 <script src="../js/shared.js"></script>
+<script src="../js/auth.js"></script>
 <script src="./editor.js"></script>
 </body>
 </html>

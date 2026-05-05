@@ -1087,7 +1087,32 @@
     });
   }
 
-  function init() {
+  async function authorizeEditor() {
+    const auth = window.UpUpUpAuth;
+    if (!auth?.requireEditorAccess) {
+      setStatus('에디터 권한 확인 모듈을 찾을 수 없습니다.');
+      return false;
+    }
+
+    setStatus('에디터 권한 확인 중...');
+    try {
+      await auth.requireEditorAccess();
+      document.body.classList.remove('is-editor-locked');
+      return true;
+    } catch (error) {
+      const code = error?.code ?? '';
+      const message = code.includes('editor-permission-denied')
+        ? '스테이지 에디터 권한이 없는 계정입니다. 관리자에게 권한을 요청하세요.'
+        : '에디터 권한 확인에 실패했습니다.';
+      setStatus(message);
+      window.alert(message);
+      window.location.replace('../index.html');
+      return false;
+    }
+  }
+
+  async function init() {
+    if (!await authorizeEditor()) return;
     if (!loadDraft()) {
       state.stageData = normalizeStageData(createSampleStage());
       state.selectedId = state.stageData.objects[0]?.id ?? null;

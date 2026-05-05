@@ -60,6 +60,11 @@ button {
   display: none !important;
 }
 
+body.is-editor-locked .editor-layout {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
 .editor-app {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
