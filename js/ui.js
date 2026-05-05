@@ -296,10 +296,17 @@
     }
 
 
-    function renderRanking(items) {
+    function renderRanking(items, error = null) {
       if (!rankingList) return;
       if (!Array.isArray(items)) {
-        rankingList.innerHTML = '<li class="ranking-empty">랭킹을 불러오지 못했습니다.</li>';
+        const code = error?.code || '';
+        if (code.includes('permission-denied')) {
+          rankingList.innerHTML = '<li class="ranking-empty">랭킹 권한이 없어 불러올 수 없습니다. Firestore 규칙을 확인하세요.</li>';
+        } else if (code.includes('failed-precondition')) {
+          rankingList.innerHTML = '<li class="ranking-empty">랭킹 인덱스 설정이 필요합니다. 콘솔 링크를 확인하세요.</li>';
+        } else {
+          rankingList.innerHTML = '<li class="ranking-empty">랭킹을 불러오지 못했습니다.</li>';
+        }
         return;
       }
       if (!items.length) {
@@ -315,15 +322,16 @@
       rankingList.innerHTML = '<li class="ranking-empty">불러오는 중...</li>';
       try {
         renderRanking(await auth.getInfiniteRanking(20));
-      } catch {
-        renderRanking(null);
+      } catch (error) {
+        if (window?.console?.error) console.error('[Ranking] getInfiniteRanking failed', error);
+        renderRanking(null, error);
       }
     }
 
     function ensureRankingRealtimeSync() {
       const auth = window.UpUpUpAuth;
       if (!auth?.subscribeInfiniteRanking || rankingUnsubscribe) return;
-      rankingUnsubscribe = auth.subscribeInfiniteRanking((items) => renderRanking(items), 20);
+      rankingUnsubscribe = auth.subscribeInfiniteRanking((items, error) => renderRanking(items, error), 20);
     }
 
     async function syncMyRankingState() {
