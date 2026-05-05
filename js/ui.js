@@ -215,12 +215,17 @@
     }
 
     function applyTheme(themeName) {
-      currentTheme = themeName === 'dark' ? 'dark' : 'light';
+      currentTheme = ['default', 'light', 'dark'].includes(themeName) ? themeName : 'default';
+      if (currentTheme === 'default') {
+        delete document.body.dataset.theme;
+        return;
+      }
       document.body.dataset.theme = currentTheme;
     }
 
     const themeItems = [
-      { id: 'light', title: '라이트 테마', price: 0, desc: '기본 밝은 UI 테마입니다.' },
+      { id: 'default', title: '기본 황색 테마', price: 0, desc: 'UPUPUP.io의 기본 황색 UI 테마입니다.' },
+      { id: 'light', title: '라이트 테마', price: 10, desc: '일반 웹사이트처럼 흰색 바탕의 UI 테마입니다.' },
       { id: 'dark', title: '다크 테마', price: 25, desc: '눈부심을 줄인 어두운 UI 테마입니다.' },
     ];
 

@@ -11,8 +11,9 @@
   const INFINITE_BEST_RECORD_KEY = 'upupup.io.infiniteBestRecord.v1';
   const STAGE_PROGRESS_KEY = 'upupup.io.stageProgress.v1';
   const THEME_SHOP_KEY = 'upupup.io.themeShop.v1';
-  const AVAILABLE_THEMES = ['light', 'dark'];
-  const DEFAULT_THEME = 'light';
+  const THEME_SHOP_VERSION = 2;
+  const AVAILABLE_THEMES = ['default', 'light', 'dark'];
+  const DEFAULT_THEME = 'default';
   const STAGE_EDITOR_DRAFT_KEY = 'upupup.stage-editor.draft.v1';
   const STAGE_EDITOR_STAGE_PREFIX = 'upupup.stage-editor.stage.v1.';
   const REMOVED_LOCAL_STORAGE_KEYS = [
@@ -124,23 +125,26 @@
     localStorage.setItem(key, JSON.stringify(value));
   }
 
-  function normalizeThemeId(value) {
+  function normalizeThemeId(value, { migrateLegacyLight = false } = {}) {
     const themeId = String(value || DEFAULT_THEME);
+    if (migrateLegacyLight && themeId === 'light') return DEFAULT_THEME;
     return AVAILABLE_THEMES.includes(themeId) ? themeId : DEFAULT_THEME;
   }
 
   function normalizeThemeShop(raw) {
     const source = raw && typeof raw === 'object' ? raw : {};
+    const migrateLegacyLight = source.schemaVersion !== THEME_SHOP_VERSION;
     const ownedThemes = Array.isArray(source.ownedThemes)
-      ? Array.from(new Set(source.ownedThemes.map(normalizeThemeId)))
+      ? Array.from(new Set(source.ownedThemes.map((themeId) => normalizeThemeId(themeId, { migrateLegacyLight }))))
       : [DEFAULT_THEME];
     if (!ownedThemes.includes(DEFAULT_THEME)) ownedThemes.unshift(DEFAULT_THEME);
 
-    const currentTheme = ownedThemes.includes(normalizeThemeId(source.currentTheme))
-      ? normalizeThemeId(source.currentTheme)
+    const normalizedCurrentTheme = normalizeThemeId(source.currentTheme, { migrateLegacyLight });
+    const currentTheme = ownedThemes.includes(normalizedCurrentTheme)
+      ? normalizedCurrentTheme
       : DEFAULT_THEME;
 
-    return { ownedThemes, currentTheme };
+    return { schemaVersion: THEME_SHOP_VERSION, ownedThemes, currentTheme };
   }
 
   function readThemeShop() {
