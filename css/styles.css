@@ -12,6 +12,20 @@
   --credit-fill-2: #ffd73f;
 }
 
+body[data-theme="dark"] {
+  --bg-1: #13161d;
+  --bg-2: #0b0e14;
+  --ink: #e7ebf4;
+  --surface: #1a1f2a;
+  --surface-strong: #252d3b;
+  --surface-muted: #1e2531;
+  --surface-selected: #334054;
+  --surface-hover: #2a3344;
+  --line: rgba(226, 234, 255, 0.8);
+  --credit-fill-1: #9be4ff;
+  --credit-fill-2: #5fc8ff;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -253,6 +267,13 @@ body {
   gap: clamp(14px, 2.4vw, 28px);
   padding: clamp(8px, 1.6vw, 16px);
   padding-bottom: clamp(104px, 14vh, 142px);
+}
+
+.shop-theme-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 .menu-panels {
