@@ -243,8 +243,9 @@
           };
         });
         callback(items);
-      }, () => {
-        callback(null);
+      }, (error) => {
+        if (window?.console?.error) console.error('[Ranking] subscribeInfiniteRanking failed', error);
+        callback(null, error);
       });
   }
 
