@@ -1224,10 +1224,28 @@ body {
 
 .auth-google-actions {
   display: grid;
-  gap: 0;
-  margin-top: 8px;
+  gap: 16px;
+  margin-top: 18px;
 }
 
+.auth-choice-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.auth-choice-label {
+  color: #5f7281;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.auth-choice-help {
+  color: #5f7281;
+  font-size: 13px;
+  line-height: 1.45;
+}
 
 .auth-line-btn {
   width: 100%;

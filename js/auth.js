@@ -63,10 +63,18 @@
     overlay.innerHTML = `
       <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <h2 id="auth-title" class="auth-title">계정 선택</h2>
-        <p class="auth-desc">로그인은 기존 Google 계정만 사용하고, 회원가입은 새 Google 계정을 등록합니다. 게스트는 이 브라우저에만 저장됩니다.</p>
+        <p class="auth-desc">로그인과 회원가입을 분리했습니다. 로그인은 이미 가입된 앱 계정만, 회원가입은 새 앱 계정 등록에 사용합니다.</p>
         <div class="auth-google-actions" aria-label="Google account actions">
-          <button class="auth-line-btn" data-auth-action="google-login" type="button">Google 계정으로 로그인하기</button>
-          <button class="auth-line-btn" data-auth-action="google-signup" type="button">Google 계정으로 회원가입하기</button>
+          <section class="auth-choice-card" aria-label="Existing account login">
+            <span class="auth-choice-label">이미 가입했다면</span>
+            <button class="auth-line-btn" data-auth-action="google-login" type="button">Google 계정으로 로그인하기</button>
+            <span class="auth-choice-help">저장된 Google 계정 데이터가 있을 때만 들어갑니다.</span>
+          </section>
+          <section class="auth-choice-card" aria-label="New account signup">
+            <span class="auth-choice-label">처음 이용한다면</span>
+            <button class="auth-line-btn" data-auth-action="google-signup" type="button">Google 계정으로 회원가입하기</button>
+            <span class="auth-choice-help">이 Google 계정을 UPUPUP.io 저장 계정으로 등록합니다.</span>
+          </section>
         </div>
         <button class="auth-line-btn auth-guest-btn" data-auth-action="guest" type="button">게스트로 플레이하기</button>
         <p class="auth-hint" id="auth-hint" aria-live="polite"></p>
@@ -92,12 +100,25 @@
     }
   }
 
-  async function rejectAccidentalSignup(user) {
-    try { await user?.delete?.(); } catch { /* ignore cleanup failures */ }
+  function createAuthError(code, message) {
+    const error = new Error(message || code);
+    error.code = code;
+    return error;
+  }
+
+  async function hasRegisteredUserData(user) {
+    if (!db) throw createAuthError('cloud-firestore-unavailable', 'Firestore SDK not loaded');
+    if (!user?.uid) return false;
+    const snap = await db.collection(USER_DATA_COLLECTION).doc(user.uid).get();
+    return snap.exists;
+  }
+
+  async function rejectUnregisteredLogin(user, { removeNewAuthUser = false } = {}) {
+    if (removeNewAuthUser) {
+      try { await user?.delete?.(); } catch { /* ignore cleanup failures */ }
+    }
     try { await auth.signOut(); } catch { /* ignore sign-out cleanup failures */ }
-    const error = new Error('account-not-found');
-    error.code = 'auth/account-not-found';
-    throw error;
+    throw createAuthError('auth/account-not-found', 'registered app account not found');
   }
 
   async function handleGoogleAuthResult(result, intent) {
@@ -105,7 +126,10 @@
     if (!user || user.isAnonymous) return null;
 
     const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
-    if (intent === 'login' && isNewUser) await rejectAccidentalSignup(user);
+    const isRegistered = await hasRegisteredUserData(user);
+    if (intent === 'login' && !isRegistered) {
+      await rejectUnregisteredLogin(user, { removeNewAuthUser: isNewUser });
+    }
 
     isGuestSession = false;
     isLocalGuestSession = false;
@@ -179,8 +203,10 @@
     const code = error?.code ?? '';
     const intent = error?.authIntent ?? fallbackIntent;
     if (code.includes('account-not-found')) return '가입된 Google 계정이 아닙니다. 먼저 회원가입을 선택해 주세요.';
-    if (code.includes('unauthorized-domain')) return '인증 도메인 설정이 필요합니다.';
+    if (code.includes('unauthorized-domain')) return '인증 도메인 설정이 필요합니다. Firebase Authorized domains에 현재 도메인을 추가해야 합니다.';
     if (code.includes('operation-not-allowed')) return 'Firebase 콘솔에서 Google 로그인이 비활성화되어 있습니다.';
+    if (code.includes('permission-denied')) return '가입 여부 확인 권한이 없습니다. Firestore userData 읽기 규칙을 확인해 주세요.';
+    if (code.includes('cloud-firestore-unavailable')) return '가입 여부 확인에 필요한 Firestore SDK를 사용할 수 없습니다.';
     if (code.includes('network-request-failed')) return '네트워크 오류로 Google 인증에 실패했습니다.';
     return intent === 'signup' ? '회원가입 실패. 다시 시도해 주세요.' : '로그인 실패. 다시 시도해 주세요.';
   }
@@ -249,7 +275,13 @@
       return { guest: true, displayName: '게스트' };
     }
     if (isGuestSession) return { guest: true, displayName: '게스트' };
-    if (auth.currentUser) return auth.currentUser;
+    if (auth.currentUser) {
+      try {
+        return await handleGoogleAuthResult({ user: auth.currentUser }, 'login');
+      } catch (error) {
+        redirectError = error;
+      }
+    }
 
     const overlay = ensureAuthModal();
     const hint = overlay.querySelector('#auth-hint');
