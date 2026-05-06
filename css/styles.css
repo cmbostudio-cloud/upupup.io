@@ -1268,3 +1268,20 @@ body {
   margin-top: 8px;
   text-align: center;
 }
+.guest-cloud-controls {
+  display: grid;
+  gap: 8px;
+  border: 1px dashed rgba(0, 0, 0, 0.16);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.guest-cloud-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.guest-cloud-actions .panel-button {
+  min-height: 44px;
+}

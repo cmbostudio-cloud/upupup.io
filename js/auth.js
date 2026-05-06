@@ -11,6 +11,7 @@
 
   const LEADERBOARD_COLLECTION = 'infiniteLeaderboard';
   const USER_DATA_COLLECTION = 'userData';
+  const GUEST_DATA_COLLECTION = 'guestUserData';
   const LEADERBOARD_LIMIT = 20;
   const EDITOR_ACCESS_CLAIMS = ['admin', 'editor', 'stageEditor'];
   const CLOUD_OWNER_KEY = 'upupup.io.cloudOwnerUid.v1';
@@ -74,14 +75,42 @@
   async function ensureSignedIn() {
     init();
     await waitForAuthReady();
-    if (auth.currentUser) return auth.currentUser;
+    if (auth.currentUser && !auth.currentUser.isAnonymous) return auth.currentUser;
     const result = await auth.signInWithPopup(googleProvider);
     return result.user;
+  }
+
+  async function ensureGuestSignedIn() {
+    init();
+    await waitForAuthReady();
+    if (auth.currentUser?.isAnonymous) {
+      isGuestSession = true;
+      return auth.currentUser;
+    }
+    if (auth.currentUser && !auth.currentUser.isAnonymous) {
+      await auth.signOut();
+    }
+    const result = await auth.signInAnonymously();
+    isGuestSession = true;
+    return result.user;
+  }
+
+  function isGuestUser(user = auth?.currentUser) {
+    return Boolean(isGuestSession || user?.isAnonymous);
+  }
+
+  function getUserDataCollection(user = auth?.currentUser) {
+    return isGuestUser(user) ? GUEST_DATA_COLLECTION : USER_DATA_COLLECTION;
   }
 
   async function promptAuthGate() {
     init();
     await waitForAuthReady();
+    if (auth.currentUser?.isAnonymous) {
+      isGuestSession = true;
+      await syncUserCloudData(auth.currentUser);
+      return { guest: true, displayName: '게스트' };
+    }
     if (isGuestSession) return { guest: true, displayName: '게스트' };
     if (auth.currentUser) return auth.currentUser;
 
@@ -116,9 +145,20 @@
         reject(error);
       };
 
-      const onGuest = () => {
-        isGuestSession = true;
-        finishOk({ guest: true, displayName: '게스트' });
+      const onGuest = async () => {
+        hint.textContent = '게스트 클라우드 저장 공간을 준비하는 중입니다...';
+        try {
+          const user = await ensureGuestSignedIn();
+          await syncUserCloudData(user);
+          finishOk({ guest: true, displayName: '게스트' });
+        } catch (error) {
+          const code = error?.code ?? '';
+          if (code.includes('operation-not-allowed')) {
+            hint.textContent = 'Firebase 콘솔에서 익명 로그인을 활성화해야 게스트 클라우드 저장을 사용할 수 있습니다.';
+            return;
+          }
+          hint.textContent = '게스트 저장 공간을 준비하지 못했습니다. 다시 시도해 주세요.';
+        }
       };
 
       guestButton?.addEventListener('click', onGuest);
@@ -209,10 +249,10 @@
 
   async function pushUserCloudData(user = auth?.currentUser) {
     init();
-    if (!db || !user || isGuestSession) return false;
+    if (!db || !user) return false;
     const data = collectLocalUserData();
     if (!data) return false;
-    await db.collection(USER_DATA_COLLECTION).doc(user.uid).set({
+    await db.collection(getUserDataCollection(user)).doc(user.uid).set({
       ...data,
       uid: user.uid,
       updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
@@ -222,8 +262,9 @@
 
   async function syncUserCloudData(user = auth?.currentUser) {
     init();
-    if (!db || !user || isGuestSession) return false;
-    const ref = db.collection(USER_DATA_COLLECTION).doc(user.uid);
+    if (!db || !user) return false;
+    if (user.isAnonymous) isGuestSession = true;
+    const ref = db.collection(getUserDataCollection(user)).doc(user.uid);
     const snap = await ref.get();
     const localData = collectLocalUserData();
     const cloudData = snap.exists ? (snap.data() || {}) : null;
@@ -238,7 +279,7 @@
 
   function queueUserDataSync() {
     init();
-    if (!auth.currentUser || isGuestSession) return;
+    if (!auth.currentUser) return;
     if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
     cloudSyncTimer = setTimeout(() => {
       cloudSyncPromise = cloudSyncPromise
@@ -247,6 +288,40 @@
           if (window?.console?.warn) console.warn('[CloudSave] sync failed', error);
         });
     }, 800);
+  }
+
+
+  async function exportGuestData() {
+    init();
+    if (!isGuestUser()) throw new Error('guest-export-requires-guest-session');
+    const user = auth.currentUser ?? await ensureGuestSignedIn();
+    await pushUserCloudData(user);
+    const payload = {
+      schema: 'upupup.io.guest-cloud-export.v1',
+      guestUid: user.uid,
+      exportedAt: Date.now(),
+      data: collectLocalUserData(),
+    };
+    return JSON.stringify(payload, null, 2);
+  }
+
+  async function importGuestData(raw) {
+    init();
+    const text = String(raw ?? '').trim();
+    if (!text) throw new Error('guest-import-empty');
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error('guest-import-invalid-json');
+    }
+    const data = parsed?.schema === 'upupup.io.guest-cloud-export.v1' ? parsed.data : parsed;
+    if (!data || typeof data !== 'object') throw new Error('guest-import-invalid-data');
+    if (!isGuestUser()) throw new Error('guest-import-requires-guest-session');
+    const user = auth.currentUser ?? await ensureGuestSignedIn();
+    await applyCloudUserData(data);
+    await pushUserCloudData(user);
+    return true;
   }
 
 
@@ -365,7 +440,7 @@
 
   async function signOut() {
     init();
-    if (auth.currentUser && !isGuestSession) {
+    if (auth.currentUser) {
       try { await pushUserCloudData(auth.currentUser); } catch { /* ignore sign-out sync failures */ }
     }
     isGuestSession = false;
@@ -376,14 +451,15 @@
   window.UpUpUpAuth = {
     init,
     ensureSignedIn,
+    ensureGuestSignedIn,
     promptAuthGate,
     hasEditorAccess,
     requireEditorAccess,
     getUser: () => {
       init();
-      return isGuestSession ? null : auth.currentUser;
+      return isGuestUser() ? null : auth.currentUser;
     },
-    isGuest: () => isGuestSession,
+    isGuest: () => isGuestUser(),
     onAuthChanged: (callback) => {
       init();
       return auth.onAuthStateChanged(callback);
@@ -394,6 +470,8 @@
     syncUserCloudData,
     pushUserCloudData,
     queueUserDataSync,
+    exportGuestData,
+    importGuestData,
     clearLocalUserData,
     upsertInfiniteRanking,
     getInfiniteRanking,

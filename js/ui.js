@@ -26,6 +26,10 @@
     const audioVolumeSlider = document.getElementById('audio-volume-slider');
     const audioVolumeValue = document.getElementById('audio-volume-value');
     const menuLogoutBtn = document.getElementById('menu-logout-btn');
+    const guestCloudControls = document.getElementById('guest-cloud-controls');
+    const guestExportBtn = document.getElementById('guest-export-btn');
+    const guestImportBtn = document.getElementById('guest-import-btn');
+    const guestImportFile = document.getElementById('guest-import-file');
     const saveStatus = document.getElementById('save-status');
     const shopThemeGrid = document.getElementById('shop-theme-grid');
     const shopThemeStatus = document.getElementById('shop-theme-status');
@@ -206,6 +210,64 @@
     function setStatus(message) {
       if (saveStatus) {
         saveStatus.textContent = message;
+      }
+    }
+
+    function syncGuestCloudControls() {
+      if (!guestCloudControls) return;
+      const isGuest = Boolean(window.UpUpUpAuth?.isGuest?.());
+      guestCloudControls.hidden = !isGuest;
+    }
+
+    function downloadTextFile(filename, text) {
+      const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function exportGuestProgress() {
+      const auth = window.UpUpUpAuth;
+      if (!auth?.isGuest?.()) {
+        setStatus('게스트 플레이 중에만 내보낼 수 있습니다.');
+        return;
+      }
+      guestExportBtn.disabled = true;
+      try {
+        const text = await auth.exportGuestData();
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        downloadTextFile(`upupup-guest-save-${stamp}.json`, text);
+        setStatus('게스트 진행상황을 내보냈습니다.');
+      } catch {
+        setStatus('게스트 진행상황 내보내기에 실패했습니다.');
+      } finally {
+        guestExportBtn.disabled = false;
+      }
+    }
+
+    async function importGuestProgress(file) {
+      const auth = window.UpUpUpAuth;
+      if (!auth?.isGuest?.()) {
+        setStatus('게스트 플레이 중에만 불러올 수 있습니다.');
+        return;
+      }
+      if (!file) return;
+      guestImportBtn.disabled = true;
+      try {
+        const text = await file.text();
+        await auth.importGuestData(text);
+        refreshAccountState();
+        setStatus('게스트 진행상황을 불러왔습니다.');
+      } catch {
+        setStatus('게스트 진행상황 불러오기에 실패했습니다.');
+      } finally {
+        guestImportBtn.disabled = false;
+        if (guestImportFile) guestImportFile.value = '';
       }
     }
 
@@ -702,12 +764,17 @@
         try {
           await auth?.signOut?.();
           setStatus('로그아웃되었습니다.');
+          syncGuestCloudControls();
           await syncMyRankingState();
           await refreshRanking();
         } catch {
           setStatus('로그아웃에 실패했습니다.');
         }
       });
+
+      guestExportBtn?.addEventListener('click', exportGuestProgress);
+      guestImportBtn?.addEventListener('click', () => guestImportFile?.click());
+      guestImportFile?.addEventListener('change', () => importGuestProgress(guestImportFile.files?.[0]));
 
       window.addEventListener('upupup:infinite-best-record-updated', scheduleRankingAutoSync);
       window.addEventListener('upupup:user-data-cloud-applied', refreshAccountState);
@@ -792,6 +859,7 @@
       renderThemeShop();
       infiniteBestRecord = readInfiniteBestRecord();
       renderInfiniteBestHud();
+      syncGuestCloudControls();
       syncMyRankingState();
     }
 
@@ -802,6 +870,7 @@
     setAutosaveEnabled(autoSaveEnabled);
     syncAudioVolumeUI();
     renderThemeShop();
+    syncGuestCloudControls();
 
     return {
       getPreferences() {

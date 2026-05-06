@@ -141,23 +141,29 @@ void (async () => {
     },
   });
 
+  async function completeInitialAuth() {
+    await auth.promptAuthGate();
+    initialSave = storageReadSave();
+    shell.updateMenuState(initialSave);
+    shell.setCreditBalance(readCreditBalance());
+    shell.refreshAccountState?.();
+    shell.setStatus(auth.isGuest?.()
+      ? '게스트 클라우드 저장으로 시작합니다.'
+      : 'Google 계정 저장 데이터를 불러왔습니다.');
+  }
+
   shell.setMenuVisible(false);
   if (auth?.waitForAuthReady) {
     try {
-      const currentUser = await auth.waitForAuthReady();
-      if (currentUser) {
-        await auth.syncUserCloudData?.(currentUser);
-        initialSave = storageReadSave();
-        shell.updateMenuState(initialSave);
-        shell.setCreditBalance(readCreditBalance());
-        shell.refreshAccountState?.();
-        shell.setStatus('Google 계정 저장 데이터를 불러왔습니다.');
-      } else {
-        shell.setStatus('Google 로그인 또는 게스트 플레이를 선택해 시작하세요.');
-      }
+      await completeInitialAuth();
     } catch (error) {
-      console.warn('[CloudSave] initial sync failed:', error);
-      shell.setStatus('저장 데이터를 불러오지 못했습니다. 로컬 데이터로 시작합니다.');
+      console.warn('[CloudSave] initial auth failed:', error);
+      shell.setStatus('시작하려면 Google 로그인 또는 게스트 플레이를 선택하세요.');
+      try {
+        await completeInitialAuth();
+      } catch {
+        shell.setStatus('인증을 완료해야 게임을 시작할 수 있습니다.');
+      }
     }
   }
   shell.setMenuVisible(true);
