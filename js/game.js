@@ -4,7 +4,7 @@ void (async () => {
 
   const shell = window.UpUpUpUI.createUIController();
   const auth = window.UpUpUpAuth;
-  const initialSave = storageReadSave();
+  let initialSave = storageReadSave();
   const audio = window.UpUpUpAudio?.createAudioManager?.(shell.getPreferences().audioVolume) ?? null;
   const canvas = document.getElementById('game-canvas');
 
@@ -42,8 +42,8 @@ void (async () => {
       return true;
     } catch (error) {
       const code = error?.code ?? '';
-      if ((error?.message ?? '').includes('auth-cancelled-by-user') || code.includes('popup-closed')) {
-        shell.setStatus('로그인/회원가입이 취소되었습니다.');
+      if (code.includes('popup-closed')) {
+        shell.setStatus('Google 인증 창이 닫혔습니다.');
         shell.setGameView?.('modes');
       } else if (code.includes('unauthorized-domain')) {
         shell.setStatus('Firebase 인증 도메인이 설정되지 않았습니다. 관리자에게 문의하세요.');
@@ -142,12 +142,22 @@ void (async () => {
   });
 
   shell.setMenuVisible(false);
-  if (auth?.promptAuthGate) {
+  if (auth?.waitForAuthReady) {
     try {
-      await auth.promptAuthGate();
-      shell.setStatus('로그인되었습니다.');
-    } catch {
-      shell.setStatus('로그인 후 이용할 수 있습니다.');
+      const currentUser = await auth.waitForAuthReady();
+      if (currentUser) {
+        await auth.syncUserCloudData?.(currentUser);
+        initialSave = storageReadSave();
+        shell.updateMenuState(initialSave);
+        shell.setCreditBalance(readCreditBalance());
+        shell.refreshAccountState?.();
+        shell.setStatus('Google 계정 저장 데이터를 불러왔습니다.');
+      } else {
+        shell.setStatus('Google 로그인 또는 게스트 플레이를 선택해 시작하세요.');
+      }
+    } catch (error) {
+      console.warn('[CloudSave] initial sync failed:', error);
+      shell.setStatus('저장 데이터를 불러오지 못했습니다. 로컬 데이터로 시작합니다.');
     }
   }
   shell.setMenuVisible(true);

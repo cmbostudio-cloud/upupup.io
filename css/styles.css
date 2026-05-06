@@ -221,23 +221,6 @@ body {
   pointer-events: none;
 }
 
-.play-time-hud {
-  position: fixed;
-  top: max(14px, env(safe-area-inset-top));
-  left: max(14px, env(safe-area-inset-left));
-  z-index: 70;
-  color: var(--ink);
-  font-family: "Courier New", monospace;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: 0.02em;
-  text-align: left;
-  white-space: pre-line;
-  pointer-events: none;
-  text-shadow: 0 1px 0 rgba(248, 243, 234, 0.88);
-}
-
 #menu-overlay {
   position: fixed;
   inset: 0;
@@ -1135,10 +1118,6 @@ body {
     top: max(58px, calc(env(safe-area-inset-top) + 44px));
   }
 
-  .play-time-hud {
-    top: max(14px, env(safe-area-inset-top));
-  }
-
   .mode-select-panel .infinite-abandon-btn {
     font-size: 14px;
     margin-top: 4px;
@@ -1243,14 +1222,6 @@ body {
   color: #3f5568;
 }
 
-.auth-mode-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin: 18px 0 6px;
-}
-
-.auth-mode-btn,
 .auth-line-btn {
   width: 100%;
   border: none;
@@ -1264,14 +1235,10 @@ body {
   transition: opacity 0.18s ease;
 }
 
-.auth-mode-btn:hover,
 .auth-line-btn:hover {
   opacity: 0.86;
 }
 
-.auth-mode-btn.is-active {
-  color: #1f2c38;
-}
 
 .auth-hint {
   margin: 12px 0 0;
@@ -1279,10 +1246,6 @@ body {
   font-size: 14px;
   text-align: center;
   color: #3f5568;
-}
-
-.auth-cancel-btn {
-  margin-top: 18px;
 }
 
 .infinite-ranking-panel {
@@ -1304,21 +1267,4 @@ body {
 .menu-meta-row {
   margin-top: 8px;
   text-align: center;
-}
-
-.save-slot-controls {
-  display: grid;
-  gap: 10px;
-}
-
-.save-slot-row {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  padding: 10px;
-  border-radius: 10px;
-}
-
-.save-slot-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
 }

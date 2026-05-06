@@ -10,8 +10,10 @@
   };
 
   const LEADERBOARD_COLLECTION = 'infiniteLeaderboard';
+  const USER_DATA_COLLECTION = 'userData';
   const LEADERBOARD_LIMIT = 20;
   const EDITOR_ACCESS_CLAIMS = ['admin', 'editor', 'stageEditor'];
+  const CLOUD_OWNER_KEY = 'upupup.io.cloudOwnerUid.v1';
 
   let app = null;
   let auth = null;
@@ -20,6 +22,9 @@
   let analytics = null;
   let authModal = null;
   let authReadyPromise = null;
+  let isGuestSession = false;
+  let cloudSyncTimer = null;
+  let cloudSyncPromise = Promise.resolve();
 
   function init() {
     if (app) return;
@@ -29,6 +34,7 @@
     auth = window.firebase.auth();
     db = window.firebase.firestore ? window.firebase.firestore() : null;
     googleProvider = new window.firebase.auth.GoogleAuthProvider();
+    googleProvider.setCustomParameters({ prompt: 'select_account' });
     if (window.firebase.analytics) analytics = window.firebase.analytics();
     authReadyPromise = new Promise((resolve) => {
       const unsub = auth.onAuthStateChanged(() => {
@@ -52,33 +58,17 @@
     overlay.hidden = true;
     overlay.innerHTML = `
       <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <h2 id="auth-title" class="auth-title">무한 모드 로그인</h2>
-        <p class="auth-desc">무한 모드를 하려면 먼저 로그인 또는 회원가입이 필요합니다.</p>
-
-        <div class="auth-mode-row" role="tablist" aria-label="인증 선택">
-          <button class="auth-mode-btn is-active" data-auth-mode-btn="login" aria-selected="true" type="button">로그인</button>
-          <button class="auth-mode-btn" data-auth-mode-btn="signup" aria-selected="false" type="button">회원가입</button>
-        </div>
-
-        <button class="auth-line-btn" data-auth-action="google" type="button">Google로 로그인</button>
+        <h2 id="auth-title" class="auth-title">Google 계정 저장</h2>
+        <p class="auth-desc">Google 계정으로 접속하면 진행, 크레딧, 최고 기록, 스테이지 진행도가 계정에 저장됩니다.</p>
+        <button class="auth-line-btn" data-auth-action="google" type="button">Google로 회원가입 및 로그인하기</button>
+        <button class="auth-line-btn auth-guest-btn" data-auth-action="guest" type="button">게스트로 플레이하기</button>
         <p class="auth-hint" id="auth-hint" aria-live="polite"></p>
-        <button class="auth-line-btn auth-cancel-btn" type="button">취소</button>
       </div>
     `;
 
     document.body.appendChild(overlay);
     authModal = overlay;
     return authModal;
-  }
-
-  function setAuthTab(tab) {
-    if (!authModal) return;
-    const tabs = authModal.querySelectorAll('[data-auth-mode-btn]');
-    tabs.forEach((btn) => {
-      const active = btn.dataset.authModeBtn === tab;
-      btn.classList.toggle('is-active', active);
-      btn.setAttribute('aria-selected', String(active));
-    });
   }
 
   async function ensureSignedIn() {
@@ -92,22 +82,15 @@
   async function promptAuthGate() {
     init();
     await waitForAuthReady();
+    if (isGuestSession) return { guest: true, displayName: '게스트' };
     if (auth.currentUser) return auth.currentUser;
 
     const overlay = ensureAuthModal();
     const hint = overlay.querySelector('#auth-hint');
-    const cancelBtn = overlay.querySelector('.auth-cancel-btn');
-    const tabButtons = Array.from(overlay.querySelectorAll('[data-auth-mode-btn]'));
     const googleButton = overlay.querySelector('[data-auth-action="google"]');
+    const guestButton = overlay.querySelector('[data-auth-action="guest"]');
 
-    let currentTab = 'login';
-    const updateGoogleLabel = () => {
-      if (!googleButton) return;
-      googleButton.textContent = currentTab === 'signup' ? 'Google로 회원가입' : 'Google로 로그인';
-    };
-
-    setAuthTab(currentTab);
-    updateGoogleLabel();
+    if (googleButton) googleButton.textContent = 'Google로 회원가입 및 로그인하기';
     hint.textContent = '';
     overlay.hidden = false;
 
@@ -133,24 +116,20 @@
         reject(error);
       };
 
-      const onCancel = () => finishErr(new Error('auth-cancelled-by-user'));
-      cancelBtn.addEventListener('click', onCancel);
-      cleanups.push(() => cancelBtn.removeEventListener('click', onCancel));
+      const onGuest = () => {
+        isGuestSession = true;
+        finishOk({ guest: true, displayName: '게스트' });
+      };
 
-      for (const tabBtn of tabButtons) {
-        const handler = () => {
-          currentTab = tabBtn.dataset.authModeBtn;
-          setAuthTab(currentTab);
-          updateGoogleLabel();
-        };
-        tabBtn.addEventListener('click', handler);
-        cleanups.push(() => tabBtn.removeEventListener('click', handler));
-      }
+      guestButton?.addEventListener('click', onGuest);
+      cleanups.push(() => guestButton?.removeEventListener('click', onGuest));
 
       const onGoogle = async () => {
         hint.textContent = 'Google 인증 창을 여는 중입니다...';
         try {
           const user = await ensureSignedIn();
+          isGuestSession = false;
+          await syncUserCloudData(user);
           finishOk(user);
         } catch (error) {
           const code = error?.code ?? '';
@@ -169,6 +148,105 @@
       googleButton?.addEventListener('click', onGoogle);
       cleanups.push(() => googleButton?.removeEventListener('click', onGoogle));
     });
+  }
+
+
+  function getShared() {
+    return window.UpUpUpShared ?? null;
+  }
+
+  function collectLocalUserData() {
+    const shared = getShared();
+    if (!shared) return null;
+    return {
+      schemaVersion: 1,
+      save: shared.storageReadSave?.() ?? null,
+      creditBalance: shared.readCreditBalance?.() ?? 0,
+      infiniteBestRecord: shared.readInfiniteBestRecord?.() ?? { score: 0, elapsedMs: null, savedAt: 0 },
+      stageProgress: shared.readStageProgress?.() ?? { maxUnlockedStage: 1 },
+      themeShop: shared.readThemeShop?.() ?? null,
+      updatedAtMs: Date.now(),
+    };
+  }
+
+  async function applyCloudUserData(data) {
+    const shared = getShared();
+    if (!shared || !data || typeof data !== 'object') return false;
+    if (data.save) {
+      await shared.storageWriteSave(data.save, 1, { skipCloudSync: true });
+    } else {
+      shared.storageDeleteSave?.(1, { skipCloudSync: true });
+    }
+    if (Number.isFinite(data.creditBalance)) shared.writeCreditBalance(data.creditBalance, { skipCloudSync: true });
+    if (data.infiniteBestRecord) await shared.writeInfiniteBestRecord(data.infiniteBestRecord, { skipCloudSync: true });
+    if (data.stageProgress) await shared.writeStageProgress(data.stageProgress, { skipCloudSync: true, replace: true });
+    if (data.themeShop) shared.writeThemeShop(data.themeShop, { skipCloudSync: true });
+    window.dispatchEvent(new CustomEvent('upupup:user-data-cloud-applied', { detail: data }));
+    return true;
+  }
+
+
+  async function clearLocalUserData() {
+    const shared = getShared();
+    if (!shared) return;
+    shared.storageDeleteSave?.(1, { skipCloudSync: true });
+    shared.writeCreditBalance?.(0, { skipCloudSync: true });
+    await shared.writeInfiniteBestRecord?.({ score: 0, elapsedMs: null, savedAt: 0 }, { skipCloudSync: true });
+    await shared.writeStageProgress?.({ maxUnlockedStage: 1 }, { skipCloudSync: true, replace: true });
+    shared.writeThemeShop?.({ ownedThemes: ['default'], currentTheme: 'default' }, { skipCloudSync: true });
+    try { localStorage.removeItem(CLOUD_OWNER_KEY); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('upupup:user-data-cloud-applied', { detail: { cleared: true } }));
+  }
+
+  function scoreCloudData(data) {
+    if (!data || typeof data !== 'object') return 0;
+    return Math.max(
+      Number(data.save?.savedAt) || 0,
+      Number(data.infiniteBestRecord?.savedAt) || 0,
+      Number(data.updatedAtMs) || 0
+    );
+  }
+
+  async function pushUserCloudData(user = auth?.currentUser) {
+    init();
+    if (!db || !user || isGuestSession) return false;
+    const data = collectLocalUserData();
+    if (!data) return false;
+    await db.collection(USER_DATA_COLLECTION).doc(user.uid).set({
+      ...data,
+      uid: user.uid,
+      updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return true;
+  }
+
+  async function syncUserCloudData(user = auth?.currentUser) {
+    init();
+    if (!db || !user || isGuestSession) return false;
+    const ref = db.collection(USER_DATA_COLLECTION).doc(user.uid);
+    const snap = await ref.get();
+    const localData = collectLocalUserData();
+    const cloudData = snap.exists ? (snap.data() || {}) : null;
+    if (cloudData && scoreCloudData(cloudData) >= scoreCloudData(localData)) {
+      await applyCloudUserData(cloudData);
+    } else {
+      await pushUserCloudData(user);
+    }
+    try { localStorage.setItem(CLOUD_OWNER_KEY, user.uid); } catch { /* ignore */ }
+    return true;
+  }
+
+  function queueUserDataSync() {
+    init();
+    if (!auth.currentUser || isGuestSession) return;
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(() => {
+      cloudSyncPromise = cloudSyncPromise
+        .then(() => pushUserCloudData(auth.currentUser))
+        .catch((error) => {
+          if (window?.console?.warn) console.warn('[CloudSave] sync failed', error);
+        });
+    }, 800);
   }
 
 
@@ -203,7 +281,7 @@
     init();
     if (!db) throw new Error('Firestore SDK not loaded');
     const user = auth.currentUser;
-    if (!user) throw new Error('Authentication required');
+    if (!user || isGuestSession) throw new Error('Authentication required');
 
     const ref = db.collection(LEADERBOARD_COLLECTION).doc(user.uid);
     const safeNickname = normalizeNickname(nickname) || user.displayName || '익명';
@@ -287,7 +365,12 @@
 
   async function signOut() {
     init();
+    if (auth.currentUser && !isGuestSession) {
+      try { await pushUserCloudData(auth.currentUser); } catch { /* ignore sign-out sync failures */ }
+    }
+    isGuestSession = false;
     await auth.signOut();
+    await clearLocalUserData();
   }
 
   window.UpUpUpAuth = {
@@ -298,8 +381,9 @@
     requireEditorAccess,
     getUser: () => {
       init();
-      return auth.currentUser;
+      return isGuestSession ? null : auth.currentUser;
     },
+    isGuest: () => isGuestSession,
     onAuthChanged: (callback) => {
       init();
       return auth.onAuthStateChanged(callback);
@@ -307,6 +391,10 @@
     signOut,
     getAnalytics: () => analytics,
     waitForAuthReady,
+    syncUserCloudData,
+    pushUserCloudData,
+    queueUserDataSync,
+    clearLocalUserData,
     upsertInfiniteRanking,
     getInfiniteRanking,
     subscribeInfiniteRanking,
