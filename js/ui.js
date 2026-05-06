@@ -464,10 +464,10 @@
           : '로그인 후 기록을 등록할 수 있습니다.';
         if (rankingNicknameInput) rankingNicknameInput.disabled = true;
         if (rankingSubmitBtn) rankingSubmitBtn.disabled = true;
-        if (rankingLogoutBtn) rankingLogoutBtn.hidden = true;
+        if (menuLogoutBtn) menuLogoutBtn.hidden = true;
         return;
       }
-      if (rankingLogoutBtn) rankingLogoutBtn.hidden = false;
+      if (menuLogoutBtn) menuLogoutBtn.hidden = false;
       if (rankingNicknameInput) rankingNicknameInput.disabled = false;
       if (rankingSubmitBtn) rankingSubmitBtn.disabled = false;
       try {

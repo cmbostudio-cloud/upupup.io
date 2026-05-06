@@ -15,6 +15,7 @@
   const LEADERBOARD_LIMIT = 20;
   const EDITOR_ACCESS_CLAIMS = ['admin', 'editor', 'stageEditor'];
   const CLOUD_OWNER_KEY = 'upupup.io.cloudOwnerUid.v1';
+  const ANONYMOUS_AUTH_UNAVAILABLE_KEY = 'upupup.io.anonymousAuthUnavailable.v1';
 
   let app = null;
   let auth = null;
@@ -87,6 +88,14 @@
     return code.includes('operation-not-allowed') || code.includes('admin-restricted-operation');
   }
 
+  function rememberAnonymousAuthUnavailable() {
+    try { sessionStorage.setItem(ANONYMOUS_AUTH_UNAVAILABLE_KEY, '1'); } catch { /* ignore */ }
+  }
+
+  function wasAnonymousAuthUnavailable() {
+    try { return sessionStorage.getItem(ANONYMOUS_AUTH_UNAVAILABLE_KEY) === '1'; } catch { return false; }
+  }
+
   function getGuestSetupErrorMessage(error) {
     const code = String(error?.code || error?.message || '');
     if (isAnonymousAuthUnavailable(error)) {
@@ -127,6 +136,11 @@
     if (auth.currentUser && !auth.currentUser.isAnonymous) {
       await auth.signOut();
     }
+    if (wasAnonymousAuthUnavailable()) {
+      isGuestSession = true;
+      isLocalGuestSession = true;
+      return createLocalGuestUser();
+    }
     try {
       const result = await auth.signInAnonymously();
       isGuestSession = true;
@@ -134,6 +148,7 @@
       return result.user;
     } catch (error) {
       if (!isAnonymousAuthUnavailable(error)) throw error;
+      rememberAnonymousAuthUnavailable();
       isGuestSession = true;
       isLocalGuestSession = true;
       if (window?.console?.warn) {
@@ -206,6 +221,14 @@
           await syncUserCloudData(user);
           finishOk({ guest: true, displayName: '게스트' });
         } catch (error) {
+          if (isAnonymousAuthUnavailable(error)) {
+            rememberAnonymousAuthUnavailable();
+            isGuestSession = true;
+            isLocalGuestSession = true;
+            hint.textContent = 'Firebase 익명 로그인이 꺼져 있어 로컬 게스트 저장으로 시작합니다.';
+            finishOk({ guest: true, localOnly: true, displayName: '게스트' });
+            return;
+          }
           if (window?.console?.error) console.error('[GuestAuth] setup failed', error);
           hint.textContent = getGuestSetupErrorMessage(error);
         }
