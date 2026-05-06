@@ -147,6 +147,14 @@
     return code.includes('operation-not-allowed') || code.includes('admin-restricted-operation');
   }
 
+  function rememberAnonymousAuthUnavailable() {
+    try { sessionStorage.setItem(ANONYMOUS_AUTH_UNAVAILABLE_KEY, '1'); } catch { /* ignore */ }
+  }
+
+  function wasAnonymousAuthUnavailable() {
+    try { return sessionStorage.getItem(ANONYMOUS_AUTH_UNAVAILABLE_KEY) === '1'; } catch { return false; }
+  }
+
   function getGuestSetupErrorMessage(error) {
     const code = String(error?.code || error?.message || '');
     if (isAnonymousAuthUnavailable(error)) {
@@ -209,6 +217,7 @@
       return result.user;
     } catch (error) {
       if (!isAnonymousAuthUnavailable(error)) throw error;
+      rememberAnonymousAuthUnavailable();
       isGuestSession = true;
       isLocalGuestSession = true;
       return createLocalGuestUser();
