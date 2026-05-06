@@ -24,6 +24,7 @@
   let authModal = null;
   let authReadyPromise = null;
   let isGuestSession = false;
+  let isLocalGuestSession = false;
   let cloudSyncTimer = null;
   let cloudSyncPromise = Promise.resolve();
 
@@ -81,10 +82,15 @@
   }
 
 
+  function isAnonymousAuthUnavailable(error) {
+    const code = String(error?.code || error?.message || '');
+    return code.includes('operation-not-allowed') || code.includes('admin-restricted-operation');
+  }
+
   function getGuestSetupErrorMessage(error) {
     const code = String(error?.code || error?.message || '');
-    if (code.includes('operation-not-allowed')) {
-      return '게스트 로그인이 꺼져 있습니다. Firebase Authentication에서 익명 로그인을 활성화해야 합니다.';
+    if (isAnonymousAuthUnavailable(error)) {
+      return 'Firebase 익명 로그인이 꺼져 있어 로컬 게스트 저장으로 시작합니다.';
     }
     if (code.includes('permission-denied')) {
       return '게스트 클라우드 저장 권한이 없습니다. Firestore 규칙에서 guestUserData 읽기/쓰기를 허용해야 합니다.';
@@ -101,23 +107,44 @@
     return `게스트 클라우드 저장 초기화에 실패했습니다.${code ? ` (${code})` : ''}`;
   }
 
+  function createLocalGuestUser() {
+    return {
+      uid: 'local-guest',
+      displayName: '게스트',
+      isAnonymous: true,
+      isLocalGuest: true,
+    };
+  }
+
   async function ensureGuestSignedIn() {
     init();
     await waitForAuthReady();
     if (auth.currentUser?.isAnonymous) {
       isGuestSession = true;
+      isLocalGuestSession = false;
       return auth.currentUser;
     }
     if (auth.currentUser && !auth.currentUser.isAnonymous) {
       await auth.signOut();
     }
-    const result = await auth.signInAnonymously();
-    isGuestSession = true;
-    return result.user;
+    try {
+      const result = await auth.signInAnonymously();
+      isGuestSession = true;
+      isLocalGuestSession = false;
+      return result.user;
+    } catch (error) {
+      if (!isAnonymousAuthUnavailable(error)) throw error;
+      isGuestSession = true;
+      isLocalGuestSession = true;
+      if (window?.console?.warn) {
+        console.warn('[GuestAuth] anonymous auth unavailable; using local guest storage.', error);
+      }
+      return createLocalGuestUser();
+    }
   }
 
   function isGuestUser(user = auth?.currentUser) {
-    return Boolean(isGuestSession || user?.isAnonymous);
+    return Boolean(isGuestSession || isLocalGuestSession || user?.isAnonymous);
   }
 
   function getUserDataCollection(user = auth?.currentUser) {
@@ -129,6 +156,7 @@
     await waitForAuthReady();
     if (auth.currentUser?.isAnonymous) {
       isGuestSession = true;
+      isLocalGuestSession = false;
       await syncUserCloudData(auth.currentUser);
       return { guest: true, displayName: '게스트' };
     }
@@ -170,6 +198,11 @@
         hint.textContent = '게스트 클라우드 저장 공간을 준비하는 중입니다...';
         try {
           const user = await ensureGuestSignedIn();
+          if (user.isLocalGuest) {
+            hint.textContent = 'Firebase 익명 로그인이 꺼져 있어 로컬 게스트 저장으로 시작합니다.';
+            finishOk({ guest: true, localOnly: true, displayName: '게스트' });
+            return;
+          }
           await syncUserCloudData(user);
           finishOk({ guest: true, displayName: '게스트' });
         } catch (error) {
@@ -186,6 +219,7 @@
         try {
           const user = await ensureSignedIn();
           isGuestSession = false;
+          isLocalGuestSession = false;
           await syncUserCloudData(user);
           finishOk(user);
         } catch (error) {
@@ -266,6 +300,7 @@
 
   async function pushUserCloudData(user = auth?.currentUser) {
     init();
+    if (isLocalGuestSession || user?.isLocalGuest) return false;
     if (!db) throw new Error('cloud-firestore-unavailable');
     if (!user) return false;
     const data = collectLocalUserData();
@@ -280,6 +315,7 @@
 
   async function syncUserCloudData(user = auth?.currentUser) {
     init();
+    if (isLocalGuestSession || user?.isLocalGuest) return false;
     if (!db) throw new Error('cloud-firestore-unavailable');
     if (!user) return false;
     if (user.isAnonymous) isGuestSession = true;
@@ -298,7 +334,7 @@
 
   function queueUserDataSync() {
     init();
-    if (!auth.currentUser) return;
+    if (isLocalGuestSession || !auth.currentUser) return;
     if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
     cloudSyncTimer = setTimeout(() => {
       cloudSyncPromise = cloudSyncPromise
@@ -313,8 +349,8 @@
   async function exportGuestData() {
     init();
     if (!isGuestUser()) throw new Error('guest-export-requires-guest-session');
-    const user = auth.currentUser ?? await ensureGuestSignedIn();
-    await pushUserCloudData(user);
+    const user = isLocalGuestSession ? createLocalGuestUser() : (auth.currentUser ?? await ensureGuestSignedIn());
+    if (!user.isLocalGuest) await pushUserCloudData(user);
     const payload = {
       schema: 'upupup.io.guest-cloud-export.v1',
       guestUid: user.uid,
@@ -337,9 +373,9 @@
     const data = parsed?.schema === 'upupup.io.guest-cloud-export.v1' ? parsed.data : parsed;
     if (!data || typeof data !== 'object') throw new Error('guest-import-invalid-data');
     if (!isGuestUser()) throw new Error('guest-import-requires-guest-session');
-    const user = auth.currentUser ?? await ensureGuestSignedIn();
+    const user = isLocalGuestSession ? createLocalGuestUser() : (auth.currentUser ?? await ensureGuestSignedIn());
     await applyCloudUserData(data);
-    await pushUserCloudData(user);
+    if (!user.isLocalGuest) await pushUserCloudData(user);
     return true;
   }
 
@@ -463,7 +499,8 @@
       try { await pushUserCloudData(auth.currentUser); } catch { /* ignore sign-out sync failures */ }
     }
     isGuestSession = false;
-    await auth.signOut();
+    isLocalGuestSession = false;
+    if (auth.currentUser) await auth.signOut();
     await clearLocalUserData();
   }
 
@@ -479,6 +516,7 @@
       return isGuestUser() ? null : auth.currentUser;
     },
     isGuest: () => isGuestUser(),
+    isLocalGuest: () => isLocalGuestSession,
     onAuthChanged: (callback) => {
       init();
       return auth.onAuthStateChanged(callback);
