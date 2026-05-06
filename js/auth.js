@@ -15,6 +15,8 @@
   const LEADERBOARD_LIMIT = 20;
   const EDITOR_ACCESS_CLAIMS = ['admin', 'editor', 'stageEditor'];
   const CLOUD_OWNER_KEY = 'upupup.io.cloudOwnerUid.v1';
+  const GOOGLE_AUTH_INTENT_KEY = 'upupup.io.googleAuthIntent.v1';
+  const ENABLE_GUEST_CLOUD_AUTH = false;
 
   let app = null;
   let auth = null;
@@ -60,9 +62,20 @@
     overlay.hidden = true;
     overlay.innerHTML = `
       <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <h2 id="auth-title" class="auth-title">Google 계정 저장</h2>
-        <p class="auth-desc">Google 계정으로 접속하면 진행, 크레딧, 최고 기록, 스테이지 진행도가 계정에 저장됩니다.</p>
-        <button class="auth-line-btn" data-auth-action="google" type="button">Google로 회원가입 및 로그인하기</button>
+        <h2 id="auth-title" class="auth-title">계정 선택</h2>
+        <p class="auth-desc">로그인과 회원가입을 분리했습니다. Google 인증이 끝나면 게임으로 돌아옵니다.</p>
+        <div class="auth-google-actions" aria-label="Google account actions">
+          <section class="auth-choice-card" aria-label="Existing account login">
+            <span class="auth-choice-label">이미 가입했다면</span>
+            <button class="auth-line-btn" data-auth-action="google-login" type="button">Google 계정으로 로그인하기</button>
+            <span class="auth-choice-help">이미 사용하던 Google 계정으로 이어서 플레이합니다.</span>
+          </section>
+          <section class="auth-choice-card" aria-label="New account signup">
+            <span class="auth-choice-label">처음 이용한다면</span>
+            <button class="auth-line-btn" data-auth-action="google-signup" type="button">Google 계정으로 회원가입하기</button>
+            <span class="auth-choice-help">선택한 Google 계정으로 처음 시작합니다.</span>
+          </section>
+        </div>
         <button class="auth-line-btn auth-guest-btn" data-auth-action="guest" type="button">게스트로 플레이하기</button>
         <p class="auth-hint" id="auth-hint" aria-live="polite"></p>
       </div>
@@ -73,14 +86,110 @@
     return authModal;
   }
 
+  function rememberGoogleAuthIntent(intent) {
+    try { sessionStorage.setItem(GOOGLE_AUTH_INTENT_KEY, intent); } catch { /* ignore */ }
+  }
+
+  function consumeGoogleAuthIntent() {
+    try {
+      const intent = sessionStorage.getItem(GOOGLE_AUTH_INTENT_KEY);
+      sessionStorage.removeItem(GOOGLE_AUTH_INTENT_KEY);
+      return intent;
+    } catch {
+      return null;
+    }
+  }
+
+  function createAuthError(code, message) {
+    const error = new Error(message || code);
+    error.code = code;
+    return error;
+  }
+
+  function isCloudUserDataUnavailable(error) {
+    const code = String(error?.code || error?.message || '');
+    return code.includes('permission-denied')
+      || code.includes('unauthenticated')
+      || code.includes('cloud-firestore-unavailable')
+      || code.includes('unavailable')
+      || code.includes('deadline-exceeded');
+  }
+
+  async function rejectNewUserLogin(user) {
+    try { await user?.delete?.(); } catch { /* ignore cleanup failures */ }
+    try { await auth.signOut(); } catch { /* ignore sign-out cleanup failures */ }
+    throw createAuthError('auth/account-not-found', 'new Google account selected from login flow');
+  }
+
+  async function syncUserCloudDataIfAllowed(user) {
+    try {
+      await syncUserCloudData(user);
+      return true;
+    } catch (error) {
+      if (!isCloudUserDataUnavailable(error)) throw error;
+      if (window?.console?.warn) {
+        console.warn('[CloudSave] Google auth succeeded but userData cloud sync is unavailable; continuing with local data.', error);
+      }
+      return false;
+    }
+  }
+
+  async function handleGoogleAuthResult(result, intent) {
+    const user = result?.user ?? auth.currentUser;
+    if (!user || user.isAnonymous) return null;
+
+    const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
+    if (intent === 'login' && isNewUser) await rejectNewUserLogin(user);
+
+    isGuestSession = false;
+    isLocalGuestSession = false;
+    await syncUserCloudDataIfAllowed(user);
+    return user;
+  }
+
+  async function completePendingGoogleRedirect() {
+    init();
+    const intent = consumeGoogleAuthIntent();
+    if (!intent || typeof auth.getRedirectResult !== 'function') return null;
+    try {
+      const result = await auth.getRedirectResult();
+      if (!result?.user) return null;
+      return handleGoogleAuthResult(result, intent);
+    } catch (error) {
+      error.authIntent = intent;
+      throw error;
+    }
+  }
+
+  async function startGoogleAuth(intent) {
+    init();
+    await waitForAuthReady();
+    if (auth.currentUser && !auth.currentUser.isAnonymous) return handleGoogleAuthResult({ user: auth.currentUser }, intent);
+    rememberGoogleAuthIntent(intent);
+    try {
+      const result = await auth.signInWithPopup(googleProvider);
+      consumeGoogleAuthIntent();
+      return handleGoogleAuthResult(result, intent);
+    } catch (error) {
+      const code = String(error?.code || error?.message || '');
+      if (!code.includes('popup-blocked') && !code.includes('popup-closed') && !code.includes('cancelled-popup-request')) {
+        consumeGoogleAuthIntent();
+        throw error;
+      }
+      if (code.includes('popup-closed') || code.includes('cancelled-popup-request')) {
+        consumeGoogleAuthIntent();
+        throw error;
+      }
+      await auth.signInWithRedirect(googleProvider);
+      return null;
+    }
+  }
+
   async function ensureSignedIn() {
     init();
     await waitForAuthReady();
-    if (auth.currentUser && !auth.currentUser.isAnonymous) return auth.currentUser;
-    const result = await auth.signInWithPopup(googleProvider);
-    return result.user;
+    return startGoogleAuth('login');
   }
-
 
   function isAnonymousAuthUnavailable(error) {
     const code = String(error?.code || error?.message || '');
@@ -90,7 +199,7 @@
   function getGuestSetupErrorMessage(error) {
     const code = String(error?.code || error?.message || '');
     if (isAnonymousAuthUnavailable(error)) {
-      return 'Firebase 익명 로그인이 꺼져 있어 로컬 게스트 저장으로 시작합니다.';
+      return '게스트는 로컬 저장으로 시작합니다.';
     }
     if (code.includes('permission-denied')) {
       return '게스트 클라우드 저장 권한이 없습니다. Firestore 규칙에서 guestUserData 읽기/쓰기를 허용해야 합니다.';
@@ -107,6 +216,20 @@
     return `게스트 클라우드 저장 초기화에 실패했습니다.${code ? ` (${code})` : ''}`;
   }
 
+  function getGoogleAuthErrorMessage(error, fallbackIntent = 'login') {
+    const code = error?.code ?? '';
+    const intent = error?.authIntent ?? fallbackIntent;
+    if (code.includes('account-not-found')) return '처음 사용하는 Google 계정입니다. 회원가입 버튼을 선택해 주세요.';
+    if (code.includes('popup-closed')) return 'Google 인증 창이 닫혔습니다. 다시 시도해 주세요.';
+    if (code.includes('cancelled-popup-request')) return 'Google 인증 요청이 취소되었습니다. 다시 시도해 주세요.';
+    if (code.includes('unauthorized-domain')) return '인증 도메인 설정이 필요합니다. Firebase Authorized domains에 현재 도메인을 추가해야 합니다.';
+    if (code.includes('operation-not-allowed')) return 'Firebase 콘솔에서 Google 로그인이 비활성화되어 있습니다.';
+    if (code.includes('permission-denied')) return 'Google 인증은 완료됐지만 저장소 권한이 없습니다. Firestore userData 규칙을 확인해 주세요.';
+    if (code.includes('cloud-firestore-unavailable')) return 'Google 인증은 완료됐지만 Firestore SDK를 사용할 수 없습니다.';
+    if (code.includes('network-request-failed')) return '네트워크 오류로 Google 인증에 실패했습니다.';
+    return intent === 'signup' ? '회원가입 실패. 다시 시도해 주세요.' : '로그인 실패. 다시 시도해 주세요.';
+  }
+
   function createLocalGuestUser() {
     return {
       uid: 'local-guest',
@@ -119,13 +242,18 @@
   async function ensureGuestSignedIn() {
     init();
     await waitForAuthReady();
+    if (auth.currentUser && !auth.currentUser.isAnonymous) {
+      await auth.signOut();
+    }
+    if (!ENABLE_GUEST_CLOUD_AUTH) {
+      isGuestSession = true;
+      isLocalGuestSession = true;
+      return createLocalGuestUser();
+    }
     if (auth.currentUser?.isAnonymous) {
       isGuestSession = true;
       isLocalGuestSession = false;
       return auth.currentUser;
-    }
-    if (auth.currentUser && !auth.currentUser.isAnonymous) {
-      await auth.signOut();
     }
     try {
       const result = await auth.signInAnonymously();
@@ -136,9 +264,6 @@
       if (!isAnonymousAuthUnavailable(error)) throw error;
       isGuestSession = true;
       isLocalGuestSession = true;
-      if (window?.console?.warn) {
-        console.warn('[GuestAuth] anonymous auth unavailable; using local guest storage.', error);
-      }
       return createLocalGuestUser();
     }
   }
@@ -154,6 +279,13 @@
   async function promptAuthGate() {
     init();
     await waitForAuthReady();
+    let redirectError = null;
+    try {
+      const redirectUser = await completePendingGoogleRedirect();
+      if (redirectUser) return redirectUser;
+    } catch (error) {
+      redirectError = error;
+    }
     if (auth.currentUser?.isAnonymous) {
       isGuestSession = true;
       isLocalGuestSession = false;
@@ -161,15 +293,23 @@
       return { guest: true, displayName: '게스트' };
     }
     if (isGuestSession) return { guest: true, displayName: '게스트' };
-    if (auth.currentUser) return auth.currentUser;
+    if (auth.currentUser) {
+      try {
+        return await handleGoogleAuthResult({ user: auth.currentUser }, 'login');
+      } catch (error) {
+        redirectError = error;
+      }
+    }
 
     const overlay = ensureAuthModal();
     const hint = overlay.querySelector('#auth-hint');
-    const googleButton = overlay.querySelector('[data-auth-action="google"]');
+    const googleLoginButton = overlay.querySelector('[data-auth-action="google-login"]');
+    const googleSignupButton = overlay.querySelector('[data-auth-action="google-signup"]');
     const guestButton = overlay.querySelector('[data-auth-action="guest"]');
 
-    if (googleButton) googleButton.textContent = 'Google로 회원가입 및 로그인하기';
-    hint.textContent = '';
+    if (googleLoginButton) googleLoginButton.textContent = 'Google 계정으로 로그인하기';
+    if (googleSignupButton) googleSignupButton.textContent = 'Google 계정으로 회원가입하기';
+    hint.textContent = redirectError ? getGoogleAuthErrorMessage(redirectError) : '';
     overlay.hidden = false;
 
     return new Promise((resolve, reject) => {
@@ -195,17 +335,24 @@
       };
 
       const onGuest = async () => {
-        hint.textContent = '게스트 클라우드 저장 공간을 준비하는 중입니다...';
+        hint.textContent = '게스트 로컬 저장 공간을 준비하는 중입니다...';
         try {
           const user = await ensureGuestSignedIn();
           if (user.isLocalGuest) {
-            hint.textContent = 'Firebase 익명 로그인이 꺼져 있어 로컬 게스트 저장으로 시작합니다.';
+            hint.textContent = '게스트는 로컬 저장으로 시작합니다.';
             finishOk({ guest: true, localOnly: true, displayName: '게스트' });
             return;
           }
           await syncUserCloudData(user);
           finishOk({ guest: true, displayName: '게스트' });
         } catch (error) {
+          if (isAnonymousAuthUnavailable(error)) {
+            isGuestSession = true;
+            isLocalGuestSession = true;
+            hint.textContent = '게스트는 로컬 저장으로 시작합니다.';
+            finishOk({ guest: true, localOnly: true, displayName: '게스트' });
+            return;
+          }
           if (window?.console?.error) console.error('[GuestAuth] setup failed', error);
           hint.textContent = getGuestSetupErrorMessage(error);
         }
@@ -214,30 +361,30 @@
       guestButton?.addEventListener('click', onGuest);
       cleanups.push(() => guestButton?.removeEventListener('click', onGuest));
 
-      const onGoogle = async () => {
-        hint.textContent = 'Google 인증 창을 여는 중입니다...';
+      const onGoogleLogin = async () => {
+        hint.textContent = 'Google 로그인 창을 여는 중입니다...';
         try {
-          const user = await ensureSignedIn();
-          isGuestSession = false;
-          isLocalGuestSession = false;
-          await syncUserCloudData(user);
-          finishOk(user);
+          const user = await startGoogleAuth('login');
+          if (user) finishOk(user);
         } catch (error) {
-          const code = error?.code ?? '';
-          if (code.includes('popup-closed')) {
-            hint.textContent = '인증 창이 닫혔습니다. 다시 시도해 주세요.';
-            return;
-          }
-          if (code.includes('unauthorized-domain')) {
-            hint.textContent = '인증 도메인 설정이 필요합니다.';
-            return;
-          }
-          hint.textContent = '로그인/회원가입 실패. 다시 시도해 주세요.';
+          hint.textContent = getGoogleAuthErrorMessage(error, 'login');
         }
       };
 
-      googleButton?.addEventListener('click', onGoogle);
-      cleanups.push(() => googleButton?.removeEventListener('click', onGoogle));
+      const onGoogleSignup = async () => {
+        hint.textContent = 'Google 회원가입 창을 여는 중입니다...';
+        try {
+          const user = await startGoogleAuth('signup');
+          if (user) finishOk(user);
+        } catch (error) {
+          hint.textContent = getGoogleAuthErrorMessage(error, 'signup');
+        }
+      };
+
+      googleLoginButton?.addEventListener('click', onGoogleLogin);
+      googleSignupButton?.addEventListener('click', onGoogleSignup);
+      cleanups.push(() => googleLoginButton?.removeEventListener('click', onGoogleLogin));
+      cleanups.push(() => googleSignupButton?.removeEventListener('click', onGoogleSignup));
     });
   }
 
