@@ -153,7 +153,7 @@ void (async () => {
   }
 
   shell.setMenuVisible(false);
-  if (auth?.promptAuthGate) {
+  if (auth?.waitForAuthReady) {
     try {
       await completeInitialAuth();
     } catch (error) {
