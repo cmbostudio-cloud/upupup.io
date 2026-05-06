@@ -1,15 +1,12 @@
 (() => {
   const {
     formatTime,
-    formatDuration,
     numberOr,
     readPrefs,
     readInfiniteBestRecord,
     writePrefs,
     writeThemeShop,
     storageReadSave,
-    storageWriteSave,
-    storageListSaves,
     hasStageEditorStage,
     getUnlockedStageLimit,
     writeCreditBalance,
@@ -28,8 +25,11 @@
     const gridToggleBtn = document.getElementById('grid-toggle-btn');
     const audioVolumeSlider = document.getElementById('audio-volume-slider');
     const audioVolumeValue = document.getElementById('audio-volume-value');
-    const saveSlotControls = document.getElementById('save-slot-controls');
     const menuLogoutBtn = document.getElementById('menu-logout-btn');
+    const guestCloudControls = document.getElementById('guest-cloud-controls');
+    const guestExportBtn = document.getElementById('guest-export-btn');
+    const guestImportBtn = document.getElementById('guest-import-btn');
+    const guestImportFile = document.getElementById('guest-import-file');
     const saveStatus = document.getElementById('save-status');
     const shopThemeGrid = document.getElementById('shop-theme-grid');
     const shopThemeStatus = document.getElementById('shop-theme-status');
@@ -160,8 +160,7 @@
     function renderInfiniteBestHud() {
       const record = infiniteBestRecord ?? readInfiniteBestRecord();
       const score = numberOr(record?.score, 0);
-      const elapsedText = formatDuration(record?.elapsedMs);
-      bestScoreHud.textContent = `최고 점수: ${score}\n기록 시간: ${elapsedText}`;
+      bestScoreHud.textContent = `최고 점수: ${score}`;
     }
 
     if (menuContinueNote) {
@@ -214,39 +213,62 @@
       }
     }
 
-    async function manualSaveToSlot(slot) {
-      const current = storageReadSave();
-      if (!current) return setStatus(`저장할 진행이 없습니다. (슬롯 ${slot})`);
-      const ok = await storageWriteSave(current, slot);
-      setStatus(ok ? `슬롯 ${slot}에 저장했습니다.` : `슬롯 ${slot} 저장에 실패했습니다.`);
-      renderSaveSlots();
+    function syncGuestCloudControls() {
+      if (!guestCloudControls) return;
+      const isGuest = Boolean(window.UpUpUpAuth?.isGuest?.());
+      guestCloudControls.hidden = !isGuest;
     }
 
-    function loadFromSlot(slot) {
-      const save = storageReadSave(slot);
-      if (!save) return setStatus(`슬롯 ${slot}에 저장된 진행이 없습니다.`);
-      const restored = storageReadSave();
-      if (!restored || restored.savedAt !== save.savedAt) {
-        storageWriteSave(save, 1).then(() => {
-          updateMenuState(save);
-          setCreditBalance(save?.credits);
-          setStatus(`슬롯 ${slot} 불러오기 완료.`);
-        });
+    function downloadTextFile(filename, text) {
+      const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function exportGuestProgress() {
+      const auth = window.UpUpUpAuth;
+      if (!auth?.isGuest?.()) {
+        setStatus('게스트 플레이 중에만 내보낼 수 있습니다.');
+        return;
+      }
+      guestExportBtn.disabled = true;
+      try {
+        const text = await auth.exportGuestData();
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        downloadTextFile(`upupup-guest-save-${stamp}.json`, text);
+        setStatus('게스트 진행상황을 내보냈습니다.');
+      } catch {
+        setStatus('게스트 진행상황 내보내기에 실패했습니다.');
+      } finally {
+        guestExportBtn.disabled = false;
       }
     }
 
-    function renderSaveSlots() {
-      if (!saveSlotControls) return;
-      const slots = storageListSaves?.() ?? [];
-      saveSlotControls.innerHTML = slots.map(({ slot, save }) => `
-        <div class="save-slot-row">
-          <span class="panel-button-title">세이브 슬롯 ${slot}</span>
-          <span class="panel-button-desc">${save ? `${formatTime(save.savedAt ?? Date.now())} | 점수 ${numberOr(save.score, 0)}` : '비어 있음'}</span>
-          <div class="save-slot-actions">
-            <button class="panel-button secondary" type="button" data-save-slot="${slot}" data-save-action="save">저장</button>
-            <button class="panel-button secondary" type="button" data-save-slot="${slot}" data-save-action="load" ${save ? '' : 'disabled'}>불러오기</button>
-          </div>
-        </div>`).join('');
+    async function importGuestProgress(file) {
+      const auth = window.UpUpUpAuth;
+      if (!auth?.isGuest?.()) {
+        setStatus('게스트 플레이 중에만 불러올 수 있습니다.');
+        return;
+      }
+      if (!file) return;
+      guestImportBtn.disabled = true;
+      try {
+        const text = await file.text();
+        await auth.importGuestData(text);
+        refreshAccountState();
+        setStatus('게스트 진행상황을 불러왔습니다.');
+      } catch {
+        setStatus('게스트 진행상황 불러오기에 실패했습니다.');
+      } finally {
+        guestImportBtn.disabled = false;
+        if (guestImportFile) guestImportFile.value = '';
+      }
     }
 
     function applyTheme(themeName) {
@@ -436,11 +458,18 @@
       const auth = window.UpUpUpAuth;
       const user = auth?.getUser?.();
       if (!user) {
-        if (rankingMyStatus) rankingMyStatus.textContent = '로그인 후 기록을 등록할 수 있습니다.';
+        const isGuest = Boolean(auth?.isGuest?.());
+        if (rankingMyStatus) rankingMyStatus.textContent = isGuest
+          ? '게스트는 랭킹을 열람만 할 수 있습니다. 기록 등록은 Google 로그인이 필요합니다.'
+          : '로그인 후 기록을 등록할 수 있습니다.';
+        if (rankingNicknameInput) rankingNicknameInput.disabled = true;
+        if (rankingSubmitBtn) rankingSubmitBtn.disabled = true;
         if (rankingLogoutBtn) rankingLogoutBtn.hidden = true;
         return;
       }
       if (rankingLogoutBtn) rankingLogoutBtn.hidden = false;
+      if (rankingNicknameInput) rankingNicknameInput.disabled = false;
+      if (rankingSubmitBtn) rankingSubmitBtn.disabled = false;
       try {
         const mine = await auth.getMyInfiniteRanking();
         if (rankingNicknameInput) rankingNicknameInput.value = mine?.nickname || user.displayName || '';
@@ -735,6 +764,7 @@
         try {
           await auth?.signOut?.();
           setStatus('로그아웃되었습니다.');
+          syncGuestCloudControls();
           await syncMyRankingState();
           await refreshRanking();
         } catch {
@@ -742,15 +772,12 @@
         }
       });
 
-      saveSlotControls?.addEventListener('click', (event) => {
-        const btn = event.target.closest('[data-save-slot]');
-        if (!btn) return;
-        const slot = Number(btn.dataset.saveSlot);
-        const action = btn.dataset.saveAction;
-        if (action === 'save') manualSaveToSlot(slot);
-        if (action === 'load') loadFromSlot(slot);
-      });
+      guestExportBtn?.addEventListener('click', exportGuestProgress);
+      guestImportBtn?.addEventListener('click', () => guestImportFile?.click());
+      guestImportFile?.addEventListener('change', () => importGuestProgress(guestImportFile.files?.[0]));
+
       window.addEventListener('upupup:infinite-best-record-updated', scheduleRankingAutoSync);
+      window.addEventListener('upupup:user-data-cloud-applied', refreshAccountState);
       window.addEventListener('beforeunload', () => {
         if (rankingUnsubscribe) rankingUnsubscribe();
       });
@@ -821,14 +848,29 @@
     setActiveTab(activeTab);
     applyTheme(currentTheme);
 
+    function refreshAccountState() {
+      const savedState = storageReadSave();
+      updateMenuState(savedState);
+      setCreditBalance(savedState?.credits ?? window.UpUpUpShared.readCreditBalance?.() ?? 0);
+      const nextPrefs = readPrefs();
+      ownedThemes = Array.isArray(nextPrefs.ownedThemes) ? nextPrefs.ownedThemes : ['default'];
+      currentTheme = typeof nextPrefs.currentTheme === 'string' ? nextPrefs.currentTheme : 'default';
+      applyTheme(currentTheme);
+      renderThemeShop();
+      infiniteBestRecord = readInfiniteBestRecord();
+      renderInfiniteBestHud();
+      syncGuestCloudControls();
+      syncMyRankingState();
+    }
+
     const savedState = storageReadSave();
     updateMenuState(savedState);
-    setCreditBalance(savedState?.credits);
+    setCreditBalance(savedState?.credits ?? window.UpUpUpShared.readCreditBalance?.() ?? 0);
     setGridVisible(gridVisible);
     setAutosaveEnabled(autoSaveEnabled);
     syncAudioVolumeUI();
     renderThemeShop();
-    renderSaveSlots();
+    syncGuestCloudControls();
 
     return {
       getPreferences() {
@@ -849,6 +891,7 @@
       hideStageClearPopup,
       showAbandonWarningPopup,
       hideAbandonWarningPopup,
+      refreshAccountState,
     };
   }
 

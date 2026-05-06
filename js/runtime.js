@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const { Square } = window.UpUpUpLogic;
   const { buildMap } = window.UpUpUpMap;
   const {
@@ -7,7 +7,6 @@
     createSeed,
     numberOr,
     formatTime,
-    formatDuration,
     AUTOSAVE_INTERVAL_MS,
     SAVE_VERSION,
     readCreditBalance,
@@ -136,12 +135,7 @@
       bestScoreHud.setAttribute('aria-live', 'polite');
       document.body.appendChild(bestScoreHud);
     }
-    let playTimeHud = null;
     let creditHud = null;
-    let runElapsedBaseMs = 0;
-    let runElapsedSessionMs = 0;
-    let runLastPerfMs = performance.now();
-    let runPaused = false;
     let bestRecord = { score: 0, elapsedMs: null, savedAt: 0 };
 
     const currentTheme = shell.getPreferences?.().currentTheme;
@@ -242,22 +236,7 @@
       bestScoreHud.hidden = false;
       bestScoreHud.classList.remove('is-menu-hud');
       bestScoreHud.classList.add('is-game-hud');
-      bestScoreHud.textContent = `기록 ${bestRecord.score} · ${formatDuration(bestRecord.elapsedMs)}`;
-    }
-
-    function ensurePlayTimeHud() {
-      if (gameMode !== 'infinite') return;
-      if (!playTimeHud) {
-        playTimeHud = document.getElementById('play-time-hud');
-        if (!playTimeHud) {
-          playTimeHud = document.createElement('div');
-          playTimeHud.id = 'play-time-hud';
-          playTimeHud.className = 'play-time-hud';
-          playTimeHud.hidden = true;
-          playTimeHud.setAttribute('aria-live', 'polite');
-          document.body.appendChild(playTimeHud);
-        }
-      }
+      bestScoreHud.textContent = `기록 ${bestRecord.score}`;
     }
 
     function ensureCreditHud() {
@@ -274,27 +253,8 @@
       }
     }
 
-    function syncRunElapsed(now = performance.now()) {
-      if (runPaused) {
-        runLastPerfMs = now;
-        return runElapsedBaseMs + runElapsedSessionMs;
-      }
-
-      const delta = Math.max(0, now - runLastPerfMs);
-      runElapsedSessionMs += delta;
-      runLastPerfMs = now;
-      return runElapsedBaseMs + runElapsedSessionMs;
-    }
-
-    function getRunElapsedMs(now = performance.now()) {
-      return syncRunElapsed(now);
-    }
-
-    function updatePlayTimeHud(now = performance.now()) {
-      if (!playTimeHud || gameMode !== 'infinite') return;
-      const elapsedMs = getRunElapsedMs(now);
-      playTimeHud.hidden = false;
-      playTimeHud.textContent = `시간 ${formatDuration(elapsedMs)}`;
+    function getRunElapsedMs() {
+      return 0;
     }
 
     function syncCamera(immediate = false) {
@@ -378,13 +338,10 @@
         if (multiplierText) {
           multiplierText.text = `x${getCreditValue(score)}`;
         }
-        if (gameMode === 'infinite' && (
-          score > bestRecord.score ||
-          (bestRecord.score > 0 && score === bestRecord.score && bestRecord.elapsedMs == null)
-        )) {
+        if (gameMode === 'infinite' && score > bestRecord.score) {
           bestRecord = {
             score,
-            elapsedMs: Math.max(0, Math.floor(getRunElapsedMs())),
+            elapsedMs: null,
             savedAt: Date.now(),
           };
           void writeInfiniteBestRecord(bestRecord);
@@ -528,7 +485,7 @@
         score,
         credits: creditBalance,
         run: {
-          elapsedMs: gameMode === 'infinite' ? Math.max(0, Math.floor(getRunElapsedMs())) : 0,
+          elapsedMs: 0,
         },
       };
     }
@@ -566,26 +523,18 @@
 
     const initialSaveForGame = initialSave ?? null;
     const initialSaveScore = numberOr(initialSaveForGame?.score, 0);
-    const initialSaveElapsedMs = Number.isFinite(initialSaveForGame?.run?.elapsedMs)
-      ? Math.max(0, Math.floor(initialSaveForGame.run.elapsedMs))
-      : null;
     const storedBestRecord = gameMode === 'infinite'
       ? readInfiniteBestRecord()
       : { score: 0, elapsedMs: null, savedAt: 0 };
     const promoteInitialSave =
       gameMode === 'infinite' &&
       initialSaveScore > 0 &&
-      (
-        initialSaveScore > storedBestRecord.score ||
-        (initialSaveScore === storedBestRecord.score &&
-          storedBestRecord.elapsedMs == null &&
-          initialSaveElapsedMs != null)
-      );
+      initialSaveScore > storedBestRecord.score;
     bestRecord = gameMode === 'infinite'
       ? (promoteInitialSave
         ? {
           score: initialSaveScore,
-          elapsedMs: initialSaveElapsedMs,
+          elapsedMs: null,
           savedAt: initialSaveForGame?.savedAt ?? Date.now(),
         }
         : storedBestRecord)
@@ -593,13 +542,7 @@
     if (promoteInitialSave) {
       void writeInfiniteBestRecord(bestRecord);
     }
-    if (gameMode === 'infinite') {
-      runElapsedBaseMs = initialSaveElapsedMs ?? 0;
-      ensurePlayTimeHud();
-      runLastPerfMs = performance.now();
-    }
     updateBestScoreHud();
-    updatePlayTimeHud();
 
     player = new Square(
       {
@@ -744,10 +687,6 @@
       if (stageCleared) return;
       const nowMs = performance.now();
       const now = nowMs * 0.001;
-      if (gameMode === 'infinite') {
-        syncRunElapsed(nowMs);
-        updatePlayTimeHud(nowMs);
-      }
       map.updateMovingSticks();
       for (const windmill of map.windmills) {
         if (windmill.chunk && !windmill.chunk.container.visible) continue;
@@ -780,23 +719,12 @@
     }
 
     window.addEventListener('pagehide', () => {
-      if (gameMode === 'infinite') {
-        syncRunElapsed();
-        runPaused = true;
-      }
       autosaveIfNeeded('Auto save');
     });
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        if (gameMode === 'infinite') {
-          syncRunElapsed();
-          runPaused = true;
-        }
         autosaveIfNeeded('Auto save');
-      } else if (gameMode === 'infinite') {
-        runPaused = false;
-        runLastPerfMs = performance.now();
       }
     });
 
