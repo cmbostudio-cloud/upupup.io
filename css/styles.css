@@ -1222,6 +1222,13 @@ body {
   color: #3f5568;
 }
 
+.auth-google-actions {
+  display: grid;
+  gap: 0;
+  margin-top: 8px;
+}
+
+
 .auth-line-btn {
   width: 100%;
   border: none;

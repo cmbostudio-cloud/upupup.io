@@ -148,7 +148,7 @@ void (async () => {
     shell.setCreditBalance(readCreditBalance());
     shell.refreshAccountState?.();
     shell.setStatus(auth.isLocalGuest?.()
-      ? 'Firebase 익명 로그인이 꺼져 있어 로컬 게스트 저장으로 시작합니다.'
+      ? '게스트 로컬 저장으로 시작합니다.'
       : auth.isGuest?.()
         ? '게스트 클라우드 저장으로 시작합니다.'
         : 'Google 계정 저장 데이터를 불러왔습니다.');
