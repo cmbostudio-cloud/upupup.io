@@ -199,12 +199,19 @@
     return normalizeThemeShop(readJSONStorage(THEME_SHOP_KEY));
   }
 
-  function writeThemeShop(themeShop) {
+  function scheduleCloudSync(options = {}) {
+    if (!options?.skipCloudSync) {
+      window.UpUpUpAuth?.queueUserDataSync?.();
+    }
+  }
+
+  function writeThemeShop(themeShop, options = {}) {
     try {
       writeJSONStorage(THEME_SHOP_KEY, normalizeThemeShop(themeShop));
     } catch {
       return false;
     }
+    scheduleCloudSync(options);
     return true;
   }
 
@@ -318,12 +325,13 @@
     return normalizeCreditBalance(readJSONStorage(CREDIT_BALANCE_KEY));
   }
 
-  function writeCreditBalance(balance) {
+  function writeCreditBalance(balance, options = {}) {
     try {
       writeJSONStorage(CREDIT_BALANCE_KEY, normalizeCreditBalance(balance));
     } catch {
       return false;
     }
+    scheduleCloudSync(options);
     return true;
   }
 
@@ -636,16 +644,14 @@
     return normalizeStageProgressData(progress);
   }
 
-  function writeLegacyStageProgress(progress) {
+  function writeLegacyStageProgress(progress, { replace = false } = {}) {
     try {
       const current = readLegacyStageProgress();
+      const nextValue = Math.max(1, Math.floor(Number.isFinite(progress?.maxUnlockedStage)
+        ? progress.maxUnlockedStage
+        : current.maxUnlockedStage));
       writeJSONStorage(STAGE_PROGRESS_KEY, {
-        maxUnlockedStage: Math.max(
-          1,
-          Math.floor(Number.isFinite(progress?.maxUnlockedStage)
-            ? progress.maxUnlockedStage
-            : current.maxUnlockedStage)
-        ),
+        maxUnlockedStage: replace ? nextValue : Math.max(current.maxUnlockedStage, nextValue),
       });
     } catch {
       return false;
@@ -729,7 +735,7 @@
     return normalizeSaveData(readLegacySave(slot));
   }
 
-  async function storageWriteSave(data, slot = 1) {
+  async function storageWriteSave(data, slot = 1, options = {}) {
     const normalized = normalizeSaveData(data);
     if (!normalized) return false;
 
@@ -746,12 +752,14 @@
       writeLegacySave(normalized, slot);
       if (slot === 1) cachedSave = deepFreeze(normalized);
       writeJSONStorage(SAVE_TOMBSTONE_KEY, false);
+      if (slot === 1) scheduleCloudSync(options);
       return true;
     } catch {
       if (secureStorageSupported) {
         try {
           if (slot === 1) cachedSave = deepFreeze(normalized);
           writeJSONStorage(SAVE_TOMBSTONE_KEY, false);
+          if (slot === 1) scheduleCloudSync(options);
           return true;
         } catch {
           return false;
@@ -768,7 +776,7 @@
     return normalizeStageProgressData(readLegacyStageProgress());
   }
 
-  async function writeStageProgress(progress) {
+  async function writeStageProgress(progress, options = {}) {
     const normalized = normalizeStageProgressData(progress);
     if (secureStorageSupported) {
       try {
@@ -780,13 +788,15 @@
     }
 
     try {
-      writeLegacyStageProgress(normalized);
+      writeLegacyStageProgress(normalized, { replace: options?.replace === true });
       cachedStageProgress = deepFreeze(normalized);
+      scheduleCloudSync(options);
       return true;
     } catch {
       if (secureStorageSupported) {
         try {
           cachedStageProgress = deepFreeze(normalized);
+          scheduleCloudSync(options);
           return true;
         } catch {
           return false;
@@ -796,10 +806,10 @@
     }
   }
 
-  async function unlockStage(stageNumber) {
+  async function unlockStage(stageNumber, options = {}) {
     const current = readStageProgress();
     const nextUnlocked = Math.max(current.maxUnlockedStage, normalizeStageNumber(stageNumber) + 1);
-    return writeStageProgress({ maxUnlockedStage: nextUnlocked });
+    return writeStageProgress({ maxUnlockedStage: nextUnlocked }, options);
   }
 
   function getUnlockedStageLimit() {
@@ -813,7 +823,7 @@
     return normalizeInfiniteBestRecord(readLegacyInfiniteBestRecord());
   }
 
-  async function writeInfiniteBestRecord(record) {
+  async function writeInfiniteBestRecord(record, options = {}) {
     const normalized = normalizeInfiniteBestRecord(record);
     if (secureStorageSupported) {
       try {
@@ -828,12 +838,14 @@
       writeJSONStorage(INFINITE_BEST_RECORD_KEY, normalized);
       writeJSONStorage(INFINITE_BEST_SCORE_KEY, normalized.score);
       cachedInfiniteBestRecord = deepFreeze(normalized);
+      scheduleCloudSync(options);
       window.dispatchEvent(new CustomEvent('upupup:infinite-best-record-updated', { detail: normalized }));
       return true;
     } catch {
       if (secureStorageSupported) {
         try {
           cachedInfiniteBestRecord = deepFreeze(normalized);
+          scheduleCloudSync(options);
           writeJSONStorage(INFINITE_BEST_SCORE_KEY, normalized.score);
           window.dispatchEvent(new CustomEvent('upupup:infinite-best-record-updated', { detail: normalized }));
           return true;
@@ -862,11 +874,14 @@
     return true;
   }
 
-  function storageDeleteSave(slot = 1) {
+  function storageDeleteSave(slot = 1, options = {}) {
     try {
       writeLegacySave(null, slot);
       writeJSONStorage(SAVE_TOMBSTONE_KEY, true);
-      if (slot === 1) cachedSave = null;
+      if (slot === 1) {
+        cachedSave = null;
+        scheduleCloudSync(options);
+      }
       return true;
     } catch {
       return false;
