@@ -63,17 +63,17 @@
     overlay.innerHTML = `
       <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <h2 id="auth-title" class="auth-title">계정 선택</h2>
-        <p class="auth-desc">로그인과 회원가입을 분리했습니다. 로그인은 이미 가입된 앱 계정만, 회원가입은 새 앱 계정 등록에 사용합니다.</p>
+        <p class="auth-desc">로그인과 회원가입을 분리했습니다. Google 인증이 끝나면 게임으로 돌아옵니다.</p>
         <div class="auth-google-actions" aria-label="Google account actions">
           <section class="auth-choice-card" aria-label="Existing account login">
             <span class="auth-choice-label">이미 가입했다면</span>
             <button class="auth-line-btn" data-auth-action="google-login" type="button">Google 계정으로 로그인하기</button>
-            <span class="auth-choice-help">저장된 Google 계정 데이터가 있을 때만 들어갑니다.</span>
+            <span class="auth-choice-help">이미 사용하던 Google 계정으로 이어서 플레이합니다.</span>
           </section>
           <section class="auth-choice-card" aria-label="New account signup">
             <span class="auth-choice-label">처음 이용한다면</span>
             <button class="auth-line-btn" data-auth-action="google-signup" type="button">Google 계정으로 회원가입하기</button>
-            <span class="auth-choice-help">이 Google 계정을 UPUPUP.io 저장 계정으로 등록합니다.</span>
+            <span class="auth-choice-help">선택한 Google 계정으로 처음 시작합니다.</span>
           </section>
         </div>
         <button class="auth-line-btn auth-guest-btn" data-auth-action="guest" type="button">게스트로 플레이하기</button>
@@ -106,19 +106,32 @@
     return error;
   }
 
-  async function hasRegisteredUserData(user) {
-    if (!db) throw createAuthError('cloud-firestore-unavailable', 'Firestore SDK not loaded');
-    if (!user?.uid) return false;
-    const snap = await db.collection(USER_DATA_COLLECTION).doc(user.uid).get();
-    return snap.exists;
+  function isCloudUserDataUnavailable(error) {
+    const code = String(error?.code || error?.message || '');
+    return code.includes('permission-denied')
+      || code.includes('unauthenticated')
+      || code.includes('cloud-firestore-unavailable')
+      || code.includes('unavailable')
+      || code.includes('deadline-exceeded');
   }
 
-  async function rejectUnregisteredLogin(user, { removeNewAuthUser = false } = {}) {
-    if (removeNewAuthUser) {
-      try { await user?.delete?.(); } catch { /* ignore cleanup failures */ }
-    }
+  async function rejectNewUserLogin(user) {
+    try { await user?.delete?.(); } catch { /* ignore cleanup failures */ }
     try { await auth.signOut(); } catch { /* ignore sign-out cleanup failures */ }
-    throw createAuthError('auth/account-not-found', 'registered app account not found');
+    throw createAuthError('auth/account-not-found', 'new Google account selected from login flow');
+  }
+
+  async function syncUserCloudDataIfAllowed(user) {
+    try {
+      await syncUserCloudData(user);
+      return true;
+    } catch (error) {
+      if (!isCloudUserDataUnavailable(error)) throw error;
+      if (window?.console?.warn) {
+        console.warn('[CloudSave] Google auth succeeded but userData cloud sync is unavailable; continuing with local data.', error);
+      }
+      return false;
+    }
   }
 
   async function handleGoogleAuthResult(result, intent) {
@@ -126,14 +139,11 @@
     if (!user || user.isAnonymous) return null;
 
     const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
-    const isRegistered = await hasRegisteredUserData(user);
-    if (intent === 'login' && !isRegistered) {
-      await rejectUnregisteredLogin(user, { removeNewAuthUser: isNewUser });
-    }
+    if (intent === 'login' && isNewUser) await rejectNewUserLogin(user);
 
     isGuestSession = false;
     isLocalGuestSession = false;
-    await syncUserCloudData(user);
+    await syncUserCloudDataIfAllowed(user);
     return user;
   }
 
@@ -156,8 +166,23 @@
     await waitForAuthReady();
     if (auth.currentUser && !auth.currentUser.isAnonymous) return handleGoogleAuthResult({ user: auth.currentUser }, intent);
     rememberGoogleAuthIntent(intent);
-    await auth.signInWithRedirect(googleProvider);
-    return null;
+    try {
+      const result = await auth.signInWithPopup(googleProvider);
+      consumeGoogleAuthIntent();
+      return handleGoogleAuthResult(result, intent);
+    } catch (error) {
+      const code = String(error?.code || error?.message || '');
+      if (!code.includes('popup-blocked') && !code.includes('popup-closed') && !code.includes('cancelled-popup-request')) {
+        consumeGoogleAuthIntent();
+        throw error;
+      }
+      if (code.includes('popup-closed') || code.includes('cancelled-popup-request')) {
+        consumeGoogleAuthIntent();
+        throw error;
+      }
+      await auth.signInWithRedirect(googleProvider);
+      return null;
+    }
   }
 
   async function ensureSignedIn() {
@@ -202,11 +227,13 @@
   function getGoogleAuthErrorMessage(error, fallbackIntent = 'login') {
     const code = error?.code ?? '';
     const intent = error?.authIntent ?? fallbackIntent;
-    if (code.includes('account-not-found')) return '가입된 Google 계정이 아닙니다. 먼저 회원가입을 선택해 주세요.';
+    if (code.includes('account-not-found')) return '처음 사용하는 Google 계정입니다. 회원가입 버튼을 선택해 주세요.';
+    if (code.includes('popup-closed')) return 'Google 인증 창이 닫혔습니다. 다시 시도해 주세요.';
+    if (code.includes('cancelled-popup-request')) return 'Google 인증 요청이 취소되었습니다. 다시 시도해 주세요.';
     if (code.includes('unauthorized-domain')) return '인증 도메인 설정이 필요합니다. Firebase Authorized domains에 현재 도메인을 추가해야 합니다.';
     if (code.includes('operation-not-allowed')) return 'Firebase 콘솔에서 Google 로그인이 비활성화되어 있습니다.';
-    if (code.includes('permission-denied')) return '가입 여부 확인 권한이 없습니다. Firestore userData 읽기 규칙을 확인해 주세요.';
-    if (code.includes('cloud-firestore-unavailable')) return '가입 여부 확인에 필요한 Firestore SDK를 사용할 수 없습니다.';
+    if (code.includes('permission-denied')) return 'Google 인증은 완료됐지만 저장소 권한이 없습니다. Firestore userData 규칙을 확인해 주세요.';
+    if (code.includes('cloud-firestore-unavailable')) return 'Google 인증은 완료됐지만 Firestore SDK를 사용할 수 없습니다.';
     if (code.includes('network-request-failed')) return '네트워크 오류로 Google 인증에 실패했습니다.';
     return intent === 'signup' ? '회원가입 실패. 다시 시도해 주세요.' : '로그인 실패. 다시 시도해 주세요.';
   }
@@ -344,7 +371,7 @@
       cleanups.push(() => guestButton?.removeEventListener('click', onGuest));
 
       const onGoogleLogin = async () => {
-        hint.textContent = 'Google 로그인 화면으로 이동합니다...';
+        hint.textContent = 'Google 로그인 창을 여는 중입니다...';
         try {
           const user = await startGoogleAuth('login');
           if (user) finishOk(user);
@@ -354,7 +381,7 @@
       };
 
       const onGoogleSignup = async () => {
-        hint.textContent = 'Google 회원가입 화면으로 이동합니다...';
+        hint.textContent = 'Google 회원가입 창을 여는 중입니다...';
         try {
           const user = await startGoogleAuth('signup');
           if (user) finishOk(user);

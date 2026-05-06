@@ -151,7 +151,7 @@ void (async () => {
       ? '게스트 로컬 저장으로 시작합니다.'
       : auth.isGuest?.()
         ? '게스트 클라우드 저장으로 시작합니다.'
-        : 'Google 계정 저장 데이터를 불러왔습니다.');
+        : 'Google 계정으로 로그인했습니다.');
   }
 
   shell.setMenuVisible(false);
