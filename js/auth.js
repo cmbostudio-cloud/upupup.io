@@ -80,6 +80,27 @@
     return result.user;
   }
 
+
+  function getGuestSetupErrorMessage(error) {
+    const code = String(error?.code || error?.message || '');
+    if (code.includes('operation-not-allowed')) {
+      return '게스트 로그인이 꺼져 있습니다. Firebase Authentication에서 익명 로그인을 활성화해야 합니다.';
+    }
+    if (code.includes('permission-denied')) {
+      return '게스트 클라우드 저장 권한이 없습니다. Firestore 규칙에서 guestUserData 읽기/쓰기를 허용해야 합니다.';
+    }
+    if (code.includes('unauthenticated')) {
+      return '게스트 인증 토큰을 확인하지 못했습니다. 새로고침 후 다시 시도해 주세요.';
+    }
+    if (code.includes('network-request-failed') || code.includes('unavailable') || code.includes('deadline-exceeded')) {
+      return '네트워크 문제로 게스트 클라우드 저장에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.';
+    }
+    if (code.includes('cloud-firestore-unavailable')) {
+      return 'Firestore SDK를 불러오지 못해 게스트 클라우드 저장을 사용할 수 없습니다.';
+    }
+    return `게스트 클라우드 저장 초기화에 실패했습니다.${code ? ` (${code})` : ''}`;
+  }
+
   async function ensureGuestSignedIn() {
     init();
     await waitForAuthReady();
@@ -152,12 +173,8 @@
           await syncUserCloudData(user);
           finishOk({ guest: true, displayName: '게스트' });
         } catch (error) {
-          const code = error?.code ?? '';
-          if (code.includes('operation-not-allowed')) {
-            hint.textContent = 'Firebase 콘솔에서 익명 로그인을 활성화해야 게스트 클라우드 저장을 사용할 수 있습니다.';
-            return;
-          }
-          hint.textContent = '게스트 저장 공간을 준비하지 못했습니다. 다시 시도해 주세요.';
+          if (window?.console?.error) console.error('[GuestAuth] setup failed', error);
+          hint.textContent = getGuestSetupErrorMessage(error);
         }
       };
 
@@ -249,7 +266,8 @@
 
   async function pushUserCloudData(user = auth?.currentUser) {
     init();
-    if (!db || !user) return false;
+    if (!db) throw new Error('cloud-firestore-unavailable');
+    if (!user) return false;
     const data = collectLocalUserData();
     if (!data) return false;
     await db.collection(getUserDataCollection(user)).doc(user.uid).set({
@@ -262,7 +280,8 @@
 
   async function syncUserCloudData(user = auth?.currentUser) {
     init();
-    if (!db || !user) return false;
+    if (!db) throw new Error('cloud-firestore-unavailable');
+    if (!user) return false;
     if (user.isAnonymous) isGuestSession = true;
     const ref = db.collection(getUserDataCollection(user)).doc(user.uid);
     const snap = await ref.get();
