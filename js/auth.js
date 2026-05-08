@@ -113,13 +113,6 @@
     try { await auth.signOut(); } catch { /* ignore sign-out cleanup failures */ }
     throw createAuthError('auth/account-not-found', 'Google account must sign up before login');
   }
-
-  async function hasRegisteredCloudAccount(user) {
-    if (!db || !user || user.isAnonymous) return true;
-    const snap = await db.collection(USER_DATA_COLLECTION).doc(user.uid).get();
-    return snap.exists;
-  }
-
   async function syncUserCloudDataIfAllowed(user) {
     try {
       await syncUserCloudData(user);
@@ -138,9 +131,11 @@
     if (!user || user.isAnonymous) return null;
 
     const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
-    if (intent === 'login') {
-      if (isNewUser) await rejectUnregisteredLogin(user, { deleteAuthUser: true });
-      if (db && !(await hasRegisteredCloudAccount(user))) await rejectUnregisteredLogin(user);
+    // Do not pre-read userData here: projects that have not deployed the
+    // userData Firestore rules yet would surface a permission error before
+    // players can see the intended signup-required state.
+    if (intent === 'login' && isNewUser) {
+      await rejectUnregisteredLogin(user, { deleteAuthUser: true });
     }
 
     isGuestSession = false;
