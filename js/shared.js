@@ -228,7 +228,7 @@
     };
   }
 
-  function writePrefs(prefs) {
+  function writePrefs(prefs, options = {}) {
     try {
       const current = readPrefs();
       writeJSONStorage(PREFS_KEY, {
@@ -242,6 +242,7 @@
     } catch {
       return false;
     }
+    scheduleCloudSync(options);
     return true;
   }
 
