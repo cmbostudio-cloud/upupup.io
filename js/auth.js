@@ -16,6 +16,7 @@
   const EDITOR_ACCESS_CLAIMS = ['admin', 'editor', 'stageEditor'];
   const CLOUD_OWNER_KEY = 'upupup.io.cloudOwnerUid.v1';
   const GOOGLE_AUTH_INTENT_KEY = 'upupup.io.googleAuthIntent.v1';
+  const ANONYMOUS_AUTH_UNAVAILABLE_KEY = 'upupup.io.anonymousAuthUnavailable.v1';
   const ENABLE_GUEST_CLOUD_AUTH = false;
 
   let app = null;
@@ -61,22 +62,12 @@
     overlay.className = 'auth-screen';
     overlay.hidden = true;
     overlay.innerHTML = `
-      <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <h2 id="auth-title" class="auth-title">계정 선택</h2>
-        <p class="auth-desc">로그인과 회원가입을 분리했습니다. Google 인증이 끝나면 게임으로 돌아옵니다.</p>
-        <div class="auth-google-actions" aria-label="Google account actions">
-          <section class="auth-choice-card" aria-label="Existing account login">
-            <span class="auth-choice-label">이미 가입했다면</span>
-            <button class="auth-line-btn" data-auth-action="google-login" type="button">Google 계정으로 로그인하기</button>
-            <span class="auth-choice-help">이미 사용하던 Google 계정으로 이어서 플레이합니다.</span>
-          </section>
-          <section class="auth-choice-card" aria-label="New account signup">
-            <span class="auth-choice-label">처음 이용한다면</span>
-            <button class="auth-line-btn" data-auth-action="google-signup" type="button">Google 계정으로 회원가입하기</button>
-            <span class="auth-choice-help">선택한 Google 계정으로 처음 시작합니다.</span>
-          </section>
+      <div class="auth-card" role="dialog" aria-modal="true" aria-label="계정 선택">
+        <div class="auth-google-actions" aria-label="계정 작업">
+          <button class="auth-line-btn" data-auth-action="google-login" type="button">Google 계정으로 로그인하기</button>
+          <button class="auth-line-btn" data-auth-action="google-signup" type="button">Google 계정으로 회원가입하기</button>
+          <button class="auth-line-btn auth-guest-btn" data-auth-action="guest" type="button">게스트로 플레이하기</button>
         </div>
-        <button class="auth-line-btn auth-guest-btn" data-auth-action="guest" type="button">게스트로 플레이하기</button>
         <p class="auth-hint" id="auth-hint" aria-live="polite"></p>
       </div>
     `;
@@ -115,10 +106,18 @@
       || code.includes('deadline-exceeded');
   }
 
-  async function rejectNewUserLogin(user) {
-    try { await user?.delete?.(); } catch { /* ignore cleanup failures */ }
+  async function rejectUnregisteredLogin(user, { deleteAuthUser = false } = {}) {
+    if (deleteAuthUser) {
+      try { await user?.delete?.(); } catch { /* ignore cleanup failures */ }
+    }
     try { await auth.signOut(); } catch { /* ignore sign-out cleanup failures */ }
-    throw createAuthError('auth/account-not-found', 'new Google account selected from login flow');
+    throw createAuthError('auth/account-not-found', 'Google account must sign up before login');
+  }
+
+  async function hasRegisteredCloudAccount(user) {
+    if (!db || !user || user.isAnonymous) return true;
+    const snap = await db.collection(USER_DATA_COLLECTION).doc(user.uid).get();
+    return snap.exists;
   }
 
   async function syncUserCloudDataIfAllowed(user) {
@@ -139,7 +138,10 @@
     if (!user || user.isAnonymous) return null;
 
     const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
-    if (intent === 'login' && isNewUser) await rejectNewUserLogin(user);
+    if (intent === 'login') {
+      if (isNewUser) await rejectUnregisteredLogin(user, { deleteAuthUser: true });
+      if (db && !(await hasRegisteredCloudAccount(user))) await rejectUnregisteredLogin(user);
+    }
 
     isGuestSession = false;
     isLocalGuestSession = false;
@@ -227,7 +229,7 @@
   function getGoogleAuthErrorMessage(error, fallbackIntent = 'login') {
     const code = error?.code ?? '';
     const intent = error?.authIntent ?? fallbackIntent;
-    if (code.includes('account-not-found')) return '처음 사용하는 Google 계정입니다. 회원가입 버튼을 선택해 주세요.';
+    if (code.includes('account-not-found')) return '회원가입이 필요한 계정입니다. 회원가입 버튼을 선택해 주세요.';
     if (code.includes('popup-closed')) return 'Google 인증 창이 닫혔습니다. 다시 시도해 주세요.';
     if (code.includes('cancelled-popup-request')) return 'Google 인증 요청이 취소되었습니다. 다시 시도해 주세요.';
     if (code.includes('unauthorized-domain')) return '인증 도메인 설정이 필요합니다. Firebase Authorized domains에 현재 도메인을 추가해야 합니다.';
@@ -412,6 +414,7 @@
       infiniteBestRecord: shared.readInfiniteBestRecord?.() ?? { score: 0, elapsedMs: null, savedAt: 0 },
       stageProgress: shared.readStageProgress?.() ?? { maxUnlockedStage: 1 },
       themeShop: shared.readThemeShop?.() ?? null,
+      prefs: shared.readPrefs?.() ?? null,
       updatedAtMs: Date.now(),
     };
   }
@@ -428,6 +431,7 @@
     if (data.infiniteBestRecord) await shared.writeInfiniteBestRecord(data.infiniteBestRecord, { skipCloudSync: true });
     if (data.stageProgress) await shared.writeStageProgress(data.stageProgress, { skipCloudSync: true, replace: true });
     if (data.themeShop) shared.writeThemeShop(data.themeShop, { skipCloudSync: true });
+    if (data.prefs) shared.writePrefs?.(data.prefs, { skipCloudSync: true });
     window.dispatchEvent(new CustomEvent('upupup:user-data-cloud-applied', { detail: data }));
     return true;
   }
@@ -441,16 +445,39 @@
     await shared.writeInfiniteBestRecord?.({ score: 0, elapsedMs: null, savedAt: 0 }, { skipCloudSync: true });
     await shared.writeStageProgress?.({ maxUnlockedStage: 1 }, { skipCloudSync: true, replace: true });
     shared.writeThemeShop?.({ ownedThemes: ['default'], currentTheme: 'default' }, { skipCloudSync: true });
+    shared.writePrefs?.({ autoSaveEnabled: true, gridVisible: true, audioVolume: 0.8 }, { skipCloudSync: true });
     try { localStorage.removeItem(CLOUD_OWNER_KEY); } catch { /* ignore */ }
     window.dispatchEvent(new CustomEvent('upupup:user-data-cloud-applied', { detail: { cleared: true } }));
   }
 
-  function scoreCloudData(data) {
+  function timestampToMs(value) {
+    if (Number.isFinite(value)) return Math.max(0, Math.floor(value));
+    if (typeof value?.toMillis === 'function') return Math.max(0, Math.floor(value.toMillis()));
+    return 0;
+  }
+
+  function hasRestorableCloudData(data) {
+    if (!data || typeof data !== 'object') return false;
+    return Boolean(
+      data.save
+      || data.prefs
+      || data.themeShop
+      || Number(data.creditBalance) > 0
+      || Number(data.infiniteBestRecord?.score) > 0
+      || Number(data.infiniteBestRecord?.savedAt) > 0
+      || Number(data.stageProgress?.maxUnlockedStage) > 1
+    );
+  }
+
+  function scoreUserData(data, { includeUpdatedAt = false } = {}) {
     if (!data || typeof data !== 'object') return 0;
+    const updatedAtScore = includeUpdatedAt
+      ? Math.max(timestampToMs(data.updatedAtMs), timestampToMs(data.updatedAt))
+      : 0;
     return Math.max(
-      Number(data.save?.savedAt) || 0,
-      Number(data.infiniteBestRecord?.savedAt) || 0,
-      Number(data.updatedAtMs) || 0
+      timestampToMs(data.save?.savedAt),
+      timestampToMs(data.infiniteBestRecord?.savedAt),
+      updatedAtScore
     );
   }
 
@@ -479,7 +506,10 @@
     const snap = await ref.get();
     const localData = collectLocalUserData();
     const cloudData = snap.exists ? (snap.data() || {}) : null;
-    if (cloudData && scoreCloudData(cloudData) >= scoreCloudData(localData)) {
+    const shouldApplyCloud = cloudData
+      && hasRestorableCloudData(cloudData)
+      && scoreUserData(cloudData, { includeUpdatedAt: true }) >= scoreUserData(localData);
+    if (shouldApplyCloud) {
       await applyCloudUserData(cloudData);
     } else {
       await pushUserCloudData(user);
