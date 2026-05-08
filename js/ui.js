@@ -9,7 +9,6 @@
     storageReadSave,
     hasStageEditorStage,
     getUnlockedStageLimit,
-    writeCreditBalance,
   } = window.UpUpUpShared;
 
   function createUIController() {
@@ -33,6 +32,8 @@
     const saveStatus = document.getElementById('save-status');
     const shopThemeGrid = document.getElementById('shop-theme-grid');
     const shopThemeStatus = document.getElementById('shop-theme-status');
+    const skinSubtabButtons = Array.from(document.querySelectorAll('[data-skin-tab]'));
+    const skinSubpanels = Array.from(document.querySelectorAll('[data-skin-panel]'));
     const gameTitle = gamePanel?.querySelector('.menu-title');
     const menuActions = gamePanel?.querySelector('.menu-actions');
     const bestScoreHud = (() => {
@@ -87,6 +88,7 @@
     let currentTheme = typeof prefs.currentTheme === 'string' ? prefs.currentTheme : 'default';
     let creditBalance = 0;
     let activeTab = 'game';
+    let activeSkinTab = 'skins';
     let gameView = 'modes';
     let infiniteBestRecord = readInfiniteBestRecord();
 
@@ -281,9 +283,9 @@
     }
 
     const themeItems = [
-      { id: 'default', title: '기본 황색 테마', price: 0, desc: 'UPUPUP.io의 기본 황색 UI 테마입니다.' },
-      { id: 'light', title: '라이트 테마', price: 10, desc: '일반 웹사이트처럼 흰색 바탕의 UI 테마입니다.' },
-      { id: 'dark', title: '다크 테마', price: 25, desc: '눈부심을 줄인 어두운 UI 테마입니다.' },
+      { id: 'default', title: '기본 황색 테마', features: ['기본', '황색'] },
+      { id: 'light', title: '라이트 테마', features: ['무료', '밝음', '흰색'] },
+      { id: 'dark', title: '다크 테마', features: ['무료', '어두움', '저자극'] },
     ];
 
     function persistThemeShop() {
@@ -293,12 +295,12 @@
     function renderThemeShop() {
       if (!shopThemeGrid) return;
       shopThemeGrid.innerHTML = themeItems.map((item) => {
-        const owned = ownedThemes.includes(item.id);
         const active = currentTheme === item.id;
+        const featureText = item.features.join(' · ');
         return `
           <button class="panel-button secondary" type="button" data-theme-id="${item.id}" aria-pressed="${active}">
             <span class="panel-button-title">${item.title}${active ? ' (적용 중)' : ''}</span>
-            <span class="panel-button-desc">${item.desc} · ${owned ? '보유' : `${item.price} 크레딧`}</span>
+            <span class="panel-button-desc">${featureText}</span>
           </button>
         `;
       }).join('');
@@ -308,19 +310,8 @@
       const item = themeItems.find((entry) => entry.id === themeId);
       if (!item) return;
 
-      if (!ownedThemes.includes(item.id)) {
-        if (creditBalance < item.price) {
-          if (shopThemeStatus) shopThemeStatus.textContent = `크레딧이 부족합니다. (${item.price} 필요)`;
-          return;
-        }
-        creditBalance -= item.price;
-        ownedThemes = Array.from(new Set([...ownedThemes, item.id]));
-        writeCreditBalance(creditBalance);
-        setCreditBalance(creditBalance);
-        if (shopThemeStatus) shopThemeStatus.textContent = `${item.title} 구매 완료!`;
-      } else if (shopThemeStatus) {
-        shopThemeStatus.textContent = `${item.title} 적용 완료!`;
-      }
+      ownedThemes = Array.from(new Set([...ownedThemes, item.id]));
+      if (shopThemeStatus) shopThemeStatus.textContent = `${item.title} 적용 완료!`;
 
       applyTheme(item.id);
       persistThemeShop();
@@ -549,6 +540,24 @@
       }
     }
 
+
+    function setActiveSkinTab(tabName) {
+      const nextTab = skinSubpanels.some((panel) => panel.dataset.skinPanel === tabName)
+        ? tabName
+        : 'skins';
+      activeSkinTab = nextTab;
+
+      for (const button of skinSubtabButtons) {
+        button.setAttribute('aria-selected', String(button.dataset.skinTab === nextTab));
+      }
+
+      for (const panel of skinSubpanels) {
+        const isActive = panel.dataset.skinPanel === nextTab;
+        panel.hidden = !isActive;
+        panel.classList.toggle('is-active', isActive);
+      }
+    }
+
     function setActiveTab(tabName) {
       const nextTab = menuPanels.some((panel) => panel.dataset.menuPanel === tabName)
         ? tabName
@@ -567,6 +576,10 @@
 
       if (nextTab === 'game') {
         setGameView('modes');
+      }
+
+      if (nextTab === 'skin') {
+        setActiveSkinTab(activeSkinTab);
       }
     }
 
@@ -817,6 +830,12 @@
         });
       }
 
+      for (const button of skinSubtabButtons) {
+        button.addEventListener('click', () => {
+          setActiveSkinTab(button.dataset.skinTab);
+        });
+      }
+
       gridToggleBtn?.addEventListener('click', () => {
         toggleGridVisible();
       });
@@ -845,6 +864,7 @@
     }
 
     bind();
+    setActiveSkinTab(activeSkinTab);
     setActiveTab(activeTab);
     applyTheme(currentTheme);
 
