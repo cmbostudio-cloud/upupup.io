@@ -6,6 +6,10 @@
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#f5f1e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="UPUPUP.io">
   <title>UPUPUP.io</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -24,15 +28,20 @@
   </button>
   <div id="menu-overlay" role="dialog" aria-label="Main menu">
     <div class="menu-tablist" role="tablist" aria-label="Main menu tabs">
-      <button id="menu-tab-shop" class="menu-tab-button" type="button" role="tab" aria-selected="false"
-        aria-controls="menu-panel-shop" data-menu-tab="shop">
-        <span class="menu-tab-kicker">SHOP</span>
-        <span class="menu-tab-label">상점</span>
-      </button>
       <button id="menu-tab-game" class="menu-tab-button" type="button" role="tab" aria-selected="true"
         aria-controls="menu-panel-game" data-menu-tab="game">
         <span class="menu-tab-kicker">GAME</span>
         <span class="menu-tab-label">메인</span>
+      </button>
+      <button id="menu-tab-skin" class="menu-tab-button" type="button" role="tab" aria-selected="false"
+        aria-controls="menu-panel-skin" data-menu-tab="skin">
+        <span class="menu-tab-kicker">SKIN</span>
+        <span class="menu-tab-label">스킨</span>
+      </button>
+      <button id="menu-tab-shop" class="menu-tab-button" type="button" role="tab" aria-selected="false"
+        aria-controls="menu-panel-shop" data-menu-tab="shop">
+        <span class="menu-tab-kicker">SHOP</span>
+        <span class="menu-tab-label">상점</span>
       </button>
       <button id="menu-tab-settings" class="menu-tab-button" type="button" role="tab" aria-selected="false"
         aria-controls="menu-panel-settings" data-menu-tab="settings">
@@ -48,8 +57,30 @@
           <div class="menu-panel-inner menu-panel-empty">
             <span class="menu-panel-kicker">SHOP</span>
             <h2 class="menu-panel-title">상점</h2>
-            <p id="shop-theme-status" class="menu-panel-empty-text">테마를 선택하면 UI 색상이 변경됩니다.</p>
-            <div id="shop-theme-grid" class="shop-theme-grid" aria-label="Theme shop"></div>
+            <p class="menu-panel-empty-text">준비중...</p>
+          </div>
+        </section>
+
+        <section id="menu-panel-skin" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-skin"
+          data-menu-panel="skin" hidden>
+          <div class="menu-panel-inner menu-panel-skin">
+            <span class="menu-panel-kicker">SKIN</span>
+            <h2 class="menu-panel-title">스킨</h2>
+            <div class="skin-subtablist" role="tablist" aria-label="Skin menu tabs">
+              <button id="skin-subtab-skins" class="skin-subtab-button" type="button" role="tab"
+                aria-selected="true" aria-controls="skin-panel-skins" data-skin-tab="skins">스킨</button>
+              <button id="skin-subtab-themes" class="skin-subtab-button" type="button" role="tab"
+                aria-selected="false" aria-controls="skin-panel-themes" data-skin-tab="themes">테마</button>
+            </div>
+            <div id="skin-panel-skins" class="skin-subpanel" role="tabpanel" aria-labelledby="skin-subtab-skins"
+              data-skin-panel="skins">
+              <p class="menu-panel-empty-text">준비중...</p>
+            </div>
+            <div id="skin-panel-themes" class="skin-subpanel" role="tabpanel" aria-labelledby="skin-subtab-themes"
+              data-skin-panel="themes" hidden>
+              <p id="shop-theme-status" class="menu-panel-empty-text">테마를 선택하세요.</p>
+              <div id="shop-theme-grid" class="shop-theme-grid" aria-label="Theme selector"></div>
+            </div>
           </div>
         </section>
 
@@ -129,6 +160,13 @@
   <script src="./js/ui.js"></script>
   <script src="./js/runtime.js"></script>
   <script src="./js/game.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
 </body>
 
 </html>
