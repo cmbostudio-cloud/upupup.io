@@ -28,6 +28,8 @@
     const PIXEL_RATIO = IS_TOUCH_DEVICE
       ? Math.min(window.devicePixelRatio || 1, 1.5)
       : window.devicePixelRatio || 1;
+    const PHONE_PORTRAIT_MAX_WIDTH = 600;
+    const PHONE_PORTRAIT_ZOOM_MULTIPLIER = 1.7;
     const gameMode = mode === 'stage' ? 'stage' : 'infinite';
     const gameStage = Math.max(1, Math.floor(Number.isFinite(Number(stage)) ? Number(stage) : 1));
     const DEFAULT_MAP_W = 900;
@@ -203,9 +205,17 @@
     let stageCleared = false;
     let saveQueue = Promise.resolve();
 
+    function isPhonePortraitViewport() {
+      return IS_TOUCH_DEVICE && CANVAS_W < CANVAS_H && CANVAS_W <= PHONE_PORTRAIT_MAX_WIDTH;
+    }
+
     function getCameraZoom() {
       if (!IS_TOUCH_DEVICE) return 1;
-      return Math.min(1, CANVAS_W / MAP_W);
+
+      const fitWidthZoom = Math.min(1, CANVAS_W / MAP_W);
+      if (!isPhonePortraitViewport()) return fitWidthZoom;
+
+      return Math.min(1, fitWidthZoom * PHONE_PORTRAIT_ZOOM_MULTIPLIER);
     }
 
     function getVisibleWorldWidth() {
