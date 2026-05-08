@@ -49,19 +49,6 @@ body[data-theme="dark"] {
   --modal-surface: rgba(26, 31, 42, 0.96);
 }
 
-body[data-theme="dark"] {
-  --bg-1: #13161d;
-  --bg-2: #0b0e14;
-  --ink: #e7ebf4;
-  --surface: #1a1f2a;
-  --surface-strong: #252d3b;
-  --surface-muted: #1e2531;
-  --surface-selected: #334054;
-  --surface-hover: #2a3344;
-  --line: rgba(226, 234, 255, 0.8);
-  --credit-fill-1: #9be4ff;
-  --credit-fill-2: #5fc8ff;
-}
 
 * {
   margin: 0;
@@ -84,6 +71,7 @@ body {
   height: 100dvh;
   overflow: hidden;
   background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  color: var(--ink);
   font-family: "Courier New", monospace;
   touch-action: none;
   overscroll-behavior: none;
@@ -381,6 +369,12 @@ body {
 
 .menu-panel-settings {
   justify-items: stretch;
+}
+
+.menu-panel-settings > .menu-panel-kicker,
+.menu-panel-settings > .menu-panel-title {
+  justify-self: center;
+  text-align: center;
 }
 
 .menu-panel-empty {
@@ -1240,12 +1234,12 @@ body {
 .auth-screen {
   position: fixed;
   inset: 0;
-  background: #f3efe6;
+  background: var(--bg-1);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 99999;
-  color: #2a3c4d;
+  color: var(--ink);
   font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
 }
 
@@ -1269,7 +1263,7 @@ body {
   font-size: 18px;
   line-height: 1.55;
   text-align: center;
-  color: #3f5568;
+  color: rgba(var(--ink-rgb), 0.78);
 }
 
 .auth-google-actions {
@@ -1285,14 +1279,14 @@ body {
 }
 
 .auth-choice-label {
-  color: #5f7281;
+  color: rgba(var(--ink-rgb), 0.68);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.12em;
 }
 
 .auth-choice-help {
-  color: #5f7281;
+  color: rgba(var(--ink-rgb), 0.68);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -1300,10 +1294,10 @@ body {
 .auth-line-btn {
   width: 100%;
   border: none;
-  border-top: 1px solid #5f7281;
-  border-bottom: 1px solid #5f7281;
+  border-top: 1px solid rgba(var(--ink-rgb), 0.68);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.68);
   background: transparent;
-  color: #2a3c4d;
+  color: var(--ink);
   padding: 13px 10px;
   font-size: 19px;
   font-weight: 600;
@@ -1320,35 +1314,33 @@ body {
   min-height: 22px;
   font-size: 14px;
   text-align: center;
-  color: #3f5568;
+  color: rgba(var(--ink-rgb), 0.78);
 }
 
 .infinite-ranking-panel {
   margin-top: 16px;
-  border-top: 1px dashed rgba(34, 34, 34, 0.25);
+  border-top: 1px dashed rgba(var(--ink-rgb), 0.25);
   padding-top: 12px;
+  color: var(--ink);
 }
 .ranking-head { margin-bottom: 8px; }
 .ranking-title { margin: 0; font-size: 20px; }
 .ranking-my-status { margin: 4px 0 0; font-size: 12px; opacity: 0.8; }
 .ranking-nickname-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
-.ranking-nickname-input { min-height: 42px; border: 2px solid var(--line); border-radius: 10px; padding: 0 10px; font-family: "Courier New", monospace; }
+.ranking-nickname-input { min-height: 42px; border: 2px solid var(--line); border-radius: 10px; padding: 0 10px; font-family: "Courier New", monospace; background: var(--surface); color: var(--ink); caret-color: var(--ink); }
+.ranking-nickname-input::placeholder { color: rgba(var(--ink-rgb), 0.5); }
 .ranking-submit-btn { min-height: 42px; width: auto; padding: 8px 12px; }
 .ranking-auth-row { margin-top: 8px; display: flex; justify-content: flex-end; }
-.ranking-logout-btn { border: 0; background: transparent; text-decoration: underline; cursor: pointer; font-family: "Courier New", monospace; color: #555; }
 .ranking-list { margin: 10px 0 0; padding-left: 20px; max-height: 180px; overflow: auto; }
 .ranking-item { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
 .ranking-empty { opacity: 0.7; }
-.menu-meta-row {
-  margin-top: 8px;
-  text-align: center;
-}
 .guest-cloud-controls {
   display: grid;
   gap: 8px;
-  border: 1px dashed rgba(0, 0, 0, 0.16);
+  border: 1px dashed rgba(var(--ink-rgb), 0.22);
   border-radius: 14px;
   padding: 12px;
+  color: var(--ink);
 }
 
 .guest-cloud-actions {
@@ -1359,4 +1351,8 @@ body {
 
 .guest-cloud-actions .panel-button {
   min-height: 44px;
+}
+
+.settings-logout-btn {
+  min-height: 72px;
 }
