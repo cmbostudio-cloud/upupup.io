@@ -1,4 +1,5 @@
 (() => {
+  const t = (key, values = {}) => window.UpUpUpI18n?.t?.(key, values) ?? key;
   const { Square } = window.UpUpUpLogic;
   const { buildMap } = window.UpUpUpMap;
   const {
@@ -96,7 +97,7 @@
       return {
         version: 1,
         stage: stageNumber,
-        name: String(raw.name || `스테이지 ${stageNumber}`),
+        name: String(raw.name || t('stage.name', { stage: stageNumber })),
         settings: {
           mapWidth,
           groundY,
@@ -125,8 +126,8 @@
     let isLoadingFromSave = false;
     const gameExitBtn = document.getElementById('game-exit-btn');
     if (gameExitBtn) {
-      gameExitBtn.textContent = '× 종료';
-      gameExitBtn.setAttribute('aria-label', '게임 종료');
+      gameExitBtn.textContent = t('game.exit');
+      gameExitBtn.setAttribute('aria-label', t('game.exit.aria'));
     }
     let bestScoreHud = document.getElementById('best-score-hud');
     if (!bestScoreHud) {
@@ -246,7 +247,7 @@
       bestScoreHud.hidden = false;
       bestScoreHud.classList.remove('is-menu-hud');
       bestScoreHud.classList.add('is-game-hud');
-      bestScoreHud.textContent = `기록 ${bestRecord.score}`;
+      bestScoreHud.textContent = t('record', { score: bestRecord.score });
     }
 
     function ensureCreditHud() {
@@ -365,7 +366,7 @@
       ensureCreditHud();
       if (!creditHud) return;
       creditHud.hidden = false;
-      creditHud.textContent = `크레딧 ${creditBalance}`;
+      creditHud.textContent = t('creditHud', { credits: creditBalance });
     }
 
     function updateStageStarText() {
@@ -376,7 +377,7 @@
       }
 
       stageStarText.visible = true;
-      stageStarText.text = `별: ${Math.min(stageStarsCollected, stageStarTotal)}/${stageStarTotal}`;
+      stageStarText.text = t('stars', { collected: Math.min(stageStarsCollected, stageStarTotal), total: stageStarTotal });
     }
 
     function followCamera() {
@@ -442,7 +443,7 @@
       }
     }
 
-    function enqueueSave(reason = '수동 저장 완료') {
+    function enqueueSave(reason = t('save.manualDone')) {
       const next = saveQueue.then(
         () => saveGame(reason),
         () => saveGame(reason)
@@ -459,8 +460,8 @@
       creditBalance += STAGE_CLEAR_REWARD;
       updateMenuCreditBalance();
       updateCreditText();
-      await enqueueSave(`스테이지 ${gameStage} 클리어 보상`);
-      setStatus(`스테이지 ${gameStage}를 클리어했습니다. 보상 +${STAGE_CLEAR_REWARD} 크레딧`);
+      await enqueueSave(t('save.stageClearReward', { stage: gameStage }));
+      setStatus(t('status.stageClear', { stage: gameStage, reward: STAGE_CLEAR_REWARD }));
       audioManager?.playStartSwoosh?.();
       shell.showStageClearPopup?.({
         stage: gameStage,
@@ -471,7 +472,7 @@
 
     async function quitToMenu() {
       shell.hideStageClearPopup?.();
-      await enqueueSave('게임 종료 전 저장');
+      await enqueueSave(t('save.beforeExit'));
       writeStartMode('menu');
       window.location.reload();
     }
@@ -500,11 +501,11 @@
       };
     }
 
-    async function saveGame(reason = '수동 저장 완료') {
+    async function saveGame(reason = t('save.manualDone')) {
       try {
         const snapshot = getSaveSnapshot();
         if (!snapshot) {
-          setStatus('저장할 게임 상태가 없습니다.');
+          setStatus(t('status.noGameToSave'));
           return false;
         }
         await storageWriteSave(snapshot);
@@ -513,7 +514,7 @@
         setStatus(`${reason} · ${formatTime(snapshot.savedAt)}`);
         return true;
       } catch {
-        setStatus('저장에 실패했습니다.');
+        setStatus(t('status.saveFailed'));
         return false;
       }
     }
@@ -521,10 +522,10 @@
     function loadCurrentSave() {
       const saved = storageReadSave();
       if (!saved) {
-        setStatus('불러올 저장 데이터가 없습니다.');
+        setStatus(t('status.noSaveToLoad'));
         return false;
       }
-      setStatus('저장 데이터를 확인했습니다. 이어서 불러옵니다.');
+      setStatus(t('status.saveVerified'));
       writeStartMode('continue');
       isLoadingFromSave = true;
       window.location.reload();
@@ -588,7 +589,7 @@
       updateMenuCreditBalance();
       updateCreditText();
       audioManager?.playCredit?.(creditValue);
-      void enqueueSave('크레딧 획득 저장');
+      void enqueueSave(t('save.creditCollected'));
     };
     player.ctx.onImpact = (impact) => {
       audioManager?.playImpact(impact);
@@ -621,7 +622,7 @@
     multiplierText.anchor.set(0.5, 0);
     uiLayer.addChild(multiplierText);
     if (gameMode === 'stage') {
-      modeText = new PIXI.Text(`스테이지 ${gameStage}`, {
+      modeText = new PIXI.Text(t('stage.name', { stage: gameStage }), {
         fontFamily: 'Courier New',
         fontSize: 16,
         fill: themePalette.inkSoft ?? 0x1a1a1a,
@@ -632,7 +633,7 @@
       modeText.y = 40;
       uiLayer.addChild(modeText);
 
-      stageStarText = new PIXI.Text('별: 0/3', {
+      stageStarText = new PIXI.Text(t('stars', { collected: 0, total: 3 }), {
         fontFamily: 'Courier New',
         fontSize: 20,
         fill: themePalette.inkSoft ?? 0x1a1a1a,
@@ -669,22 +670,22 @@
     audioManager?.playStartSwoosh();
 
     if (initialSaveForGame) {
-      setStatus(`저장 데이터를 불러왔습니다 · ${formatTime(initialSaveForGame.savedAt ?? Date.now())}`);
+      setStatus(t('status.saveLoaded', { time: formatTime(initialSaveForGame.savedAt ?? Date.now()) }));
     } else {
       setStatus(gameMode === 'stage'
-        ? `스테이지 ${gameStage}를 시작합니다.`
-        : '무한 모드를 시작합니다.');
+        ? t('status.startStageNumber', { stage: gameStage })
+        : t('status.startInfinite'));
     }
 
     shell.setActions({
       onSetGridVisible: (visible) => {
         setGridVisible(visible);
-        setStatus(visible ? '그리드를 켰습니다.' : '그리드를 껐습니다.');
+        setStatus(visible ? t('status.gridOn') : t('status.gridOff'));
       },
       onToggleGrid: () => {
         const nextVisible = !gridVisible;
         setGridVisible(nextVisible);
-        setStatus(nextVisible ? '그리드를 켰습니다.' : '그리드를 껐습니다.');
+        setStatus(nextVisible ? t('status.gridOn') : t('status.gridOff'));
       },
       onQuit: () => {
         quitToMenu();
