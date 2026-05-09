@@ -136,8 +136,14 @@
     infiniteAbandonBtn.type = 'button';
     infiniteAbandonBtn.className = 'infinite-abandon-btn';
     infiniteAbandonBtn.textContent = t('infinite.abandon');
+
+    const menuBestScoreHud = document.createElement('div');
+    menuBestScoreHud.id = 'best-score-hud';
+    menuBestScoreHud.className = 'best-score-hud is-menu-hud';
+    menuBestScoreHud.hidden = true;
+    menuBestScoreHud.setAttribute('aria-live', 'polite');
+
     infiniteSelectPanel.appendChild(infiniteAbandonBtn);
-    infiniteSelectPanel.appendChild(menuBestScoreHud);
 
     const rankingPanel = document.createElement('div');
     rankingPanel.className = 'infinite-ranking-panel';
@@ -209,7 +215,7 @@
       gamePanel.append(stageSelectPanel, infiniteSelectPanel);
     }
 
-    document.body.append(stageClearPopup, abandonWarningPopup);
+    document.body.append(stageClearPopup, abandonWarningPopup, menuBestScoreHud);
 
     const stageBackBtn = stageSelectPanel.querySelector('#stage-back-btn');
     const stageGrid = stageSelectPanel.querySelector('#stage-grid');
@@ -481,6 +487,18 @@
       const auth = window.UpUpUpAuth;
       if (!auth?.subscribeInfiniteRanking || rankingUnsubscribe) return;
       rankingUnsubscribe = auth.subscribeInfiniteRanking((items, error) => renderRanking(items, error), 20);
+    }
+
+    function syncBestScoreHudVisibility() {
+      if (!menuBestScoreHud) return;
+      const shouldShow = menuVisible && activeTab === 'game' && gameView === 'infinite';
+      menuBestScoreHud.hidden = !shouldShow;
+      if (!shouldShow) return;
+
+      const record = readInfiniteBestRecord();
+      menuBestScoreHud.classList.remove('is-game-hud');
+      menuBestScoreHud.classList.add('is-menu-hud');
+      menuBestScoreHud.textContent = t('record', { score: numberOr(record?.score, 0) });
     }
 
     async function syncMyRankingState() {
@@ -833,7 +851,10 @@
       guestImportBtn?.addEventListener('click', () => guestImportFile?.click());
       guestImportFile?.addEventListener('change', () => importGuestProgress(guestImportFile.files?.[0]));
 
-      window.addEventListener('upupup:infinite-best-record-updated', scheduleRankingAutoSync);
+      window.addEventListener('upupup:infinite-best-record-updated', () => {
+        scheduleRankingAutoSync();
+        syncBestScoreHudVisibility();
+      });
       window.addEventListener('upupup:language-changed', () => {
         language = i18n?.readLanguage?.() ?? language;
         renderStaticCopy();
