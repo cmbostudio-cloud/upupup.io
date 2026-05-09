@@ -224,6 +224,7 @@
       audioVolume: Number.isFinite(prefs?.audioVolume)
         ? Math.max(0, Math.min(1, prefs.audioVolume))
         : 0.8,
+      language: ['ko', 'en'].includes(prefs?.language) ? prefs.language : 'ko',
       ...themeShop,
     };
   }
@@ -238,6 +239,7 @@
         audioVolume: Number.isFinite(prefs.audioVolume)
           ? Math.max(0, Math.min(1, prefs.audioVolume))
           : current.audioVolume,
+        language: ['ko', 'en'].includes(prefs.language) ? prefs.language : current.language,
       });
     } catch {
       return false;

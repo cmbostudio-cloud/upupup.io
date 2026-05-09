@@ -1,4 +1,4 @@
-const CACHE_NAME = 'upupup-io-v2';
+const CACHE_NAME = 'upupup-io-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const APP_SHELL = [
   './js/logic.js',
   './js/map.js',
   './js/shared.js',
+  './js/i18n.js',
   './js/audio.js',
   './js/auth.js',
   './js/ui.js',
@@ -39,12 +40,10 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => (
-      cachedResponse || fetch(event.request).then((networkResponse) => {
-        const responseClone = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-        return networkResponse;
-      })
-    )),
+    fetch(event.request).then((networkResponse) => {
+      const responseClone = networkResponse.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+      return networkResponse;
+    }).catch(() => caches.match(event.request)),
   );
 });
