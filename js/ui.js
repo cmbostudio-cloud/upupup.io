@@ -42,18 +42,11 @@
     const skinSubpanels = Array.from(document.querySelectorAll('[data-skin-panel]'));
     const gameTitle = gamePanel?.querySelector('.menu-title');
     const menuActions = gamePanel?.querySelector('.menu-actions');
-    const bestScoreHud = (() => {
-      let hud = document.getElementById('best-score-hud');
-      if (!hud) {
-        hud = document.createElement('div');
-        hud.id = 'best-score-hud';
-        hud.className = 'best-score-hud';
-        hud.hidden = true;
-        hud.setAttribute('aria-live', 'polite');
-        document.body.appendChild(hud);
-      }
-      return hud;
-    })();
+    const menuBestScoreHud = document.createElement('div');
+    menuBestScoreHud.id = 'infinite-best-score-hud';
+    menuBestScoreHud.className = 'best-score-hud infinite-best-score-hud';
+    menuBestScoreHud.hidden = true;
+    menuBestScoreHud.setAttribute('aria-live', 'polite');
 
     const stageClearPopup = document.createElement('div');
     stageClearPopup.className = 'stage-clear-popup';
@@ -90,7 +83,7 @@
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
     let audioVolume = prefs.audioVolume;
-    let language = i18n?.normalizeLanguage?.(prefs.language) ?? 'ko';
+    let language = i18n?.readLanguage?.() ?? i18n?.normalizeLanguage?.(prefs.language) ?? 'ko';
     let menuVisible = true;
     let ownedThemes = Array.isArray(prefs.ownedThemes) ? prefs.ownedThemes : ['default'];
     let currentTheme = typeof prefs.currentTheme === 'string' ? prefs.currentTheme : 'default';
@@ -151,6 +144,7 @@
     infiniteAbandonBtn.className = 'infinite-abandon-btn';
     infiniteAbandonBtn.textContent = t('infinite.abandon');
     infiniteSelectPanel.appendChild(infiniteAbandonBtn);
+    infiniteSelectPanel.appendChild(menuBestScoreHud);
 
     const rankingPanel = document.createElement('div');
     rankingPanel.className = 'infinite-ranking-panel';
@@ -170,16 +164,13 @@
     function renderInfiniteBestHud() {
       const record = infiniteBestRecord ?? readInfiniteBestRecord();
       const score = numberOr(record?.score, 0);
-      bestScoreHud.textContent = t('bestScore', { score });
+      menuBestScoreHud.textContent = t('bestScore', { score });
     }
 
     function syncBestScoreHudVisibility() {
       const shouldShowMenuHud = menuVisible && activeTab === 'game' && gameView === 'infinite';
-      bestScoreHud.hidden = !shouldShowMenuHud;
-      bestScoreHud.classList.toggle('is-menu-hud', shouldShowMenuHud);
-      if (!shouldShowMenuHud) {
-        bestScoreHud.classList.remove('is-game-hud');
-      }
+      menuBestScoreHud.hidden = !shouldShowMenuHud;
+      menuBestScoreHud.classList.toggle('is-menu-hud', shouldShowMenuHud);
     }
 
     function renderLanguageControl() {
@@ -953,10 +944,12 @@
       updateMenuState(savedState);
       setCreditBalance(savedState?.credits ?? window.UpUpUpShared.readCreditBalance?.() ?? 0);
       const nextPrefs = readPrefs();
+      i18n?.reloadLanguage?.();
+      language = i18n?.readLanguage?.() ?? language;
       ownedThemes = Array.isArray(nextPrefs.ownedThemes) ? nextPrefs.ownedThemes : ['default'];
       currentTheme = typeof nextPrefs.currentTheme === 'string' ? nextPrefs.currentTheme : 'default';
       applyTheme(currentTheme);
-      renderThemeShop();
+      renderStaticCopy();
       infiniteBestRecord = readInfiniteBestRecord();
       renderInfiniteBestHud();
       syncGuestCloudControls();

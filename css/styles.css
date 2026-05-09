@@ -1371,3 +1371,31 @@ body {
   color: var(--ink);
   font: 700 14px "Courier New", monospace;
 }
+
+.infinite-select-panel .infinite-best-score-hud {
+  position: absolute;
+}
+
+.settings-logout-btn {
+  justify-self: center;
+  min-height: 0;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(var(--ink-rgb), 0.76);
+  font: 700 13px "Courier New", monospace;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
+  cursor: pointer;
+}
+
+.settings-logout-btn:hover,
+.settings-logout-btn:focus-visible {
+  color: var(--ink);
+}
+
+.infinite-select-panel {
+  position: relative;
+}

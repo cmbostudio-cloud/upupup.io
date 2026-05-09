@@ -297,12 +297,20 @@
     },
   };
 
+  let currentLanguage = DEFAULT_LANGUAGE;
+
   function normalizeLanguage(language) {
     return SUPPORTED_LANGUAGES.includes(language) ? language : DEFAULT_LANGUAGE;
   }
 
   function readLanguage() {
-    return normalizeLanguage(window.UpUpUpShared?.readPrefs?.().language || DEFAULT_LANGUAGE);
+    return currentLanguage;
+  }
+
+  function reloadLanguage() {
+    currentLanguage = normalizeLanguage(window.UpUpUpShared?.readPrefs?.().language || DEFAULT_LANGUAGE);
+    document.documentElement.lang = currentLanguage;
+    return currentLanguage;
   }
 
   function interpolate(template, values = {}) {
@@ -310,12 +318,13 @@
   }
 
   function t(key, values = {}) {
-    const language = readLanguage();
-    return interpolate(dictionaries[language]?.[key] ?? dictionaries[DEFAULT_LANGUAGE][key] ?? key, values);
+    const activeLanguage = readLanguage();
+    return interpolate(dictionaries[activeLanguage]?.[key] ?? dictionaries[DEFAULT_LANGUAGE][key] ?? key, values);
   }
 
   function setLanguage(language) {
     const normalized = normalizeLanguage(language);
+    currentLanguage = normalized;
     window.UpUpUpShared?.writePrefs?.({ language: normalized });
     document.documentElement.lang = normalized;
     window.dispatchEvent(new CustomEvent('upupup:language-changed', { detail: { language: normalized } }));
@@ -335,11 +344,14 @@
     });
   }
 
+  reloadLanguage();
+
   window.UpUpUpI18n = {
     DEFAULT_LANGUAGE,
     SUPPORTED_LANGUAGES,
     normalizeLanguage,
     readLanguage,
+    reloadLanguage,
     setLanguage,
     t,
     applyToDocument,
