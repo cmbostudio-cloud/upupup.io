@@ -14,6 +14,7 @@
   const GUEST_DATA_COLLECTION = 'guestUserData';
   const LEADERBOARD_LIMIT = 20;
   const EDITOR_ACCESS_PASSWORD = 'teasung123';
+  const EDITOR_ACCESS_SESSION_KEY = 'upupup.io.editorAccessGranted.v1';
   const CLOUD_OWNER_KEY = 'upupup.io.cloudOwnerUid.v1';
   const GOOGLE_AUTH_INTENT_KEY = 'upupup.io.googleAuthIntent.v1';
   const ANONYMOUS_AUTH_UNAVAILABLE_KEY = 'upupup.io.anonymousAuthUnavailable.v1';
@@ -561,12 +562,31 @@
   }
 
 
+  function hasRememberedEditorAccess() {
+    try {
+      return window.sessionStorage?.getItem(EDITOR_ACCESS_SESSION_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  function rememberEditorAccess() {
+    try {
+      window.sessionStorage?.setItem(EDITOR_ACCESS_SESSION_KEY, 'true');
+    } catch {
+      // Ignore session storage failures; the current password check still succeeds.
+    }
+  }
+
   function hasEditorAccess(password = '') {
-    return String(password ?? '') === EDITOR_ACCESS_PASSWORD;
+    return hasRememberedEditorAccess() || String(password ?? '') === EDITOR_ACCESS_PASSWORD;
   }
 
   async function requireEditorAccess(password = '') {
-    if (hasEditorAccess(password)) return true;
+    if (hasEditorAccess(password)) {
+      if (String(password ?? '') === EDITOR_ACCESS_PASSWORD) rememberEditorAccess();
+      return true;
+    }
 
     const error = new Error('editor-password-denied');
     error.code = 'editor-password-denied';
