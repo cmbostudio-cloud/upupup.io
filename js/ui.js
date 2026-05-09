@@ -720,15 +720,18 @@
           return;
         }
 
+        const password = window.prompt(t('editor.passwordPrompt'));
+        if (password == null) return;
+
         editorAccessBtn.disabled = true;
         editorAccessBtn.textContent = t('editor.checking');
         try {
-          await auth.requireEditorAccess();
+          await auth.requireEditorAccess(password);
           window.location.href = './editor/';
         } catch (error) {
           const code = error?.code ?? '';
-          if (code.includes('editor-permission-denied')) {
-            window.alert(t('editor.denied'));
+          if (code.includes('editor-password-denied')) {
+            window.alert(t('editor.passwordDenied'));
           } else {
             window.alert(t('editor.failed'));
           }
