@@ -1,4 +1,7 @@
 (() => {
+  const i18n = window.UpUpUpI18n;
+  const t = (key, values = {}) => i18n?.t?.(key, values) ?? key;
+
   const {
     formatTime,
     numberOr,
@@ -25,6 +28,9 @@
     const audioVolumeSlider = document.getElementById('audio-volume-slider');
     const audioVolumeValue = document.getElementById('audio-volume-value');
     const menuLogoutBtn = document.getElementById('menu-logout-btn');
+    const languageSelect = document.getElementById('language-select');
+    const languageLabel = document.getElementById('language-label');
+    const languageDesc = document.getElementById('language-desc');
     const guestCloudControls = document.getElementById('guest-cloud-controls');
     const guestExportBtn = document.getElementById('guest-export-btn');
     const guestImportBtn = document.getElementById('guest-import-btn');
@@ -54,14 +60,14 @@
     stageClearPopup.hidden = true;
     stageClearPopup.innerHTML = `
       <div class="stage-clear-panel" role="dialog" aria-modal="true" aria-labelledby="stage-clear-title" aria-describedby="stage-clear-desc">
-        <span class="stage-clear-kicker">CLEAR</span>
-        <h2 id="stage-clear-title" class="stage-clear-title">스테이지 클리어</h2>
-        <p id="stage-clear-desc" class="stage-clear-desc">별을 모두 모아 스테이지를 완료했습니다.</p>
+        <span class="stage-clear-kicker">${t('stage.clear.kicker')}</span>
+        <h2 id="stage-clear-title" class="stage-clear-title">${t('stage.clear.title')}</h2>
+        <p id="stage-clear-desc" class="stage-clear-desc">${t('stage.clear.desc')}</p>
         <div class="stage-clear-reward" aria-live="polite">
-          <span class="stage-clear-reward-label">보상</span>
-          <span id="stage-clear-reward-value" class="stage-clear-reward-value">+5 크레딧</span>
+          <span class="stage-clear-reward-label">${t('stage.clear.rewardLabel')}</span>
+          <span id="stage-clear-reward-value" class="stage-clear-reward-value">${t('stage.clear.reward', { reward: 5 })}</span>
         </div>
-        <button id="stage-clear-confirm-btn" class="panel-button secondary stage-clear-confirm-btn" type="button">메뉴로 돌아가기</button>
+        <button id="stage-clear-confirm-btn" class="panel-button secondary stage-clear-confirm-btn" type="button">${t('stage.clear.confirm')}</button>
       </div>
     `;
 
@@ -70,12 +76,12 @@
     abandonWarningPopup.hidden = true;
     abandonWarningPopup.innerHTML = `
       <div class="abandon-warning-panel" role="dialog" aria-modal="true" aria-labelledby="abandon-warning-title" aria-describedby="abandon-warning-desc">
-        <span class="abandon-warning-kicker">주의</span>
-        <h2 id="abandon-warning-title" class="abandon-warning-title">무한 모드를 중단할까요?</h2>
-        <p id="abandon-warning-desc" class="abandon-warning-desc">진행 중인 무한 모드 저장이 삭제됩니다.</p>
+        <span class="abandon-warning-kicker">${t('abandon.kicker')}</span>
+        <h2 id="abandon-warning-title" class="abandon-warning-title">${t('abandon.title')}</h2>
+        <p id="abandon-warning-desc" class="abandon-warning-desc">${t('abandon.desc')}</p>
         <div class="abandon-warning-actions">
-          <button id="abandon-cancel-btn" class="panel-button secondary abandon-cancel-btn" type="button">취소</button>
-          <button id="abandon-confirm-btn" class="panel-button secondary abandon-confirm-btn" type="button">중도 포기</button>
+          <button id="abandon-cancel-btn" class="panel-button secondary abandon-cancel-btn" type="button">${t('cancel')}</button>
+          <button id="abandon-confirm-btn" class="panel-button secondary abandon-confirm-btn" type="button">${t('abandon.confirm')}</button>
         </div>
       </div>
     `;
@@ -84,6 +90,8 @@
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
     let audioVolume = prefs.audioVolume;
+    let language = i18n?.normalizeLanguage?.(prefs.language) ?? 'ko';
+    let menuVisible = true;
     let ownedThemes = Array.isArray(prefs.ownedThemes) ? prefs.ownedThemes : ['default'];
     let currentTheme = typeof prefs.currentTheme === 'string' ? prefs.currentTheme : 'default';
     let creditBalance = 0;
@@ -101,11 +109,11 @@
     stageSelectPanel.innerHTML = `
       <div class="mode-select-head stage-select-head">
         <button id="stage-back-btn" class="panel-button secondary stage-back-btn" type="button">
-          <span class="panel-button-title">뒤로</span>
-          <span class="panel-button-desc">메인 화면으로 돌아갑니다.</span>
+          <span class="panel-button-title">${t('back.title')}</span>
+          <span class="panel-button-desc">${t('back.desc')}</span>
         </button>
         <div class="mode-select-copy stage-select-copy">
-          <h3 class="menu-panel-title">스테이지 선택</h3>
+          <h3 class="menu-panel-title">${t('stageSelect.title')}</h3>
         </div>
       </div>
       <div id="stage-grid" class="stage-grid" aria-label="Stage list"></div>
@@ -118,21 +126,21 @@
     infiniteSelectPanel.innerHTML = `
       <div class="mode-select-head infinite-select-head">
         <button id="infinite-back-btn" class="panel-button secondary infinite-back-btn" type="button">
-          <span class="panel-button-title">뒤로</span>
-          <span class="panel-button-desc">메인 화면으로 돌아갑니다.</span>
+          <span class="panel-button-title">${t('back.title')}</span>
+          <span class="panel-button-desc">${t('back.desc')}</span>
         </button>
         <div class="mode-select-copy infinite-select-copy">
-          <h3 class="menu-panel-title">무한 모드</h3>
+          <h3 class="menu-panel-title">${t('infinite.title')}</h3>
         </div>
       </div>
       <div class="infinite-action-row">
         <button id="infinite-new-btn" class="panel-button secondary" type="button">
-          <span class="panel-button-title">새 게임</span>
-          <span class="panel-button-desc">무한 모드를 처음부터 새로 시작합니다.</span>
+          <span class="panel-button-title">${t('infinite.new.title')}</span>
+          <span class="panel-button-desc">${t('infinite.new.desc')}</span>
         </button>
         <button id="infinite-continue-btn" class="panel-button secondary" type="button">
-          <span class="panel-button-title">이어하기</span>
-          <span class="panel-button-desc">마지막 무한 모드 저장에서 계속합니다.</span>
+          <span class="panel-button-title">${t('infinite.continue.title')}</span>
+          <span class="panel-button-desc">${t('infinite.continue.desc')}</span>
         </button>
       </div>
     `;
@@ -141,19 +149,19 @@
     infiniteAbandonBtn.id = 'infinite-abandon-btn';
     infiniteAbandonBtn.type = 'button';
     infiniteAbandonBtn.className = 'infinite-abandon-btn';
-    infiniteAbandonBtn.textContent = '[중도 포기]';
+    infiniteAbandonBtn.textContent = t('infinite.abandon');
     infiniteSelectPanel.appendChild(infiniteAbandonBtn);
 
     const rankingPanel = document.createElement('div');
     rankingPanel.className = 'infinite-ranking-panel';
     rankingPanel.innerHTML = `
       <div class="ranking-head">
-        <h4 class="ranking-title">랭킹</h4>
-        <p id="ranking-my-status" class="ranking-my-status">로그인 후 기록을 등록할 수 있습니다.</p>
+        <h4 class="ranking-title">${t('ranking.title')}</h4>
+        <p id="ranking-my-status" class="ranking-my-status">${t('ranking.guestStatus')}</p>
       </div>
       <div class="ranking-nickname-row">
-        <input id="ranking-nickname-input" class="ranking-nickname-input" type="text" maxlength="20" placeholder="닉네임 입력" aria-label="닉네임">
-        <button id="ranking-submit-btn" class="panel-button secondary ranking-submit-btn" type="button">내 기록 등록/갱신</button>
+        <input id="ranking-nickname-input" class="ranking-nickname-input" type="text" maxlength="20" placeholder="${t('ranking.nickname.placeholder')}" aria-label="${t('ranking.nickname.aria')}">
+        <button id="ranking-submit-btn" class="panel-button secondary ranking-submit-btn" type="button">${t('ranking.submit')}</button>
       </div>
       <ol id="ranking-list" class="ranking-list"></ol>
     `;
@@ -162,7 +170,65 @@
     function renderInfiniteBestHud() {
       const record = infiniteBestRecord ?? readInfiniteBestRecord();
       const score = numberOr(record?.score, 0);
-      bestScoreHud.textContent = `최고 점수: ${score}`;
+      bestScoreHud.textContent = t('bestScore', { score });
+    }
+
+    function syncBestScoreHudVisibility() {
+      const shouldShowMenuHud = menuVisible && activeTab === 'game' && gameView === 'infinite';
+      bestScoreHud.hidden = !shouldShowMenuHud;
+      bestScoreHud.classList.toggle('is-menu-hud', shouldShowMenuHud);
+      if (!shouldShowMenuHud) {
+        bestScoreHud.classList.remove('is-game-hud');
+      }
+    }
+
+    function renderLanguageControl() {
+      if (languageSelect) {
+        languageSelect.value = language;
+        for (const option of languageSelect.options) {
+          option.textContent = t(`language.${option.value}`);
+        }
+      }
+      if (languageLabel) languageLabel.textContent = t('language.label');
+      if (languageDesc) languageDesc.textContent = t('language.desc');
+    }
+
+    function renderStaticCopy() {
+      i18n?.applyToDocument?.();
+      renderLanguageControl();
+      stageBackBtn?.querySelector('.panel-button-title')?.replaceChildren(document.createTextNode(t('back.title')));
+      stageBackBtn?.querySelector('.panel-button-desc')?.replaceChildren(document.createTextNode(t('back.desc')));
+      stageSelectPanel.querySelector('.menu-panel-title').textContent = t('stageSelect.title');
+      infiniteBackBtn?.querySelector('.panel-button-title')?.replaceChildren(document.createTextNode(t('back.title')));
+      infiniteBackBtn?.querySelector('.panel-button-desc')?.replaceChildren(document.createTextNode(t('back.desc')));
+      infiniteSelectPanel.querySelector('.menu-panel-title').textContent = t('infinite.title');
+      infiniteNewBtn.querySelector('.panel-button-title').textContent = t('infinite.new.title');
+      infiniteNewBtn.querySelector('.panel-button-desc').textContent = t('infinite.new.desc');
+      infiniteContinueBtn.querySelector('.panel-button-title').textContent = t('infinite.continue.title');
+      infiniteContinueBtn.querySelector('.panel-button-desc').textContent = t('infinite.continue.desc');
+      infiniteAbandonBtn.textContent = t('infinite.abandon');
+      rankingPanel.querySelector('.ranking-title').textContent = t('ranking.title');
+      rankingNicknameInput?.setAttribute('placeholder', t('ranking.nickname.placeholder'));
+      rankingNicknameInput?.setAttribute('aria-label', t('ranking.nickname.aria'));
+      if (rankingSubmitBtn) rankingSubmitBtn.textContent = t('ranking.submit');
+      stageClearPopup.querySelector('.stage-clear-kicker').textContent = t('stage.clear.kicker');
+      stageClearPopup.querySelector('#stage-clear-title').textContent = t('stage.clear.title');
+      stageClearPopup.querySelector('#stage-clear-desc').textContent = t('stage.clear.desc');
+      stageClearPopup.querySelector('.stage-clear-reward-label').textContent = t('stage.clear.rewardLabel');
+      if (stageClearRewardValue) stageClearRewardValue.textContent = t('stage.clear.reward', { reward: 5 });
+      if (stageClearConfirmBtn) stageClearConfirmBtn.textContent = t('stage.clear.confirm');
+      abandonWarningPopup.querySelector('.abandon-warning-kicker').textContent = t('abandon.kicker');
+      abandonWarningPopup.querySelector('#abandon-warning-title').textContent = t('abandon.title');
+      abandonWarningPopup.querySelector('#abandon-warning-desc').textContent = t('abandon.desc');
+      if (abandonCancelBtn) abandonCancelBtn.textContent = t('cancel');
+      if (abandonConfirmBtn) abandonConfirmBtn.textContent = t('abandon.confirm');
+      setModeCardCopy();
+      renderStageCards();
+      renderThemeShop();
+      renderInfiniteBestHud();
+      setGridVisible(gridVisible, { persist: false });
+      updateMenuState(storageReadSave());
+      if (shopThemeStatus) shopThemeStatus.textContent = t('theme.choose');
     }
 
     if (menuContinueNote) {
@@ -194,14 +260,14 @@
     let rankingUnsubscribe = null;
 
     let actions = {
-      onStartStageMode: () => setStatus('스테이지를 선택하세요.'),
-      onStartInfiniteMode: () => setStatus('무한 모드를 선택하세요.'),
-      onStartStage: () => setStatus('스테이지를 시작합니다.'),
-      onStartInfiniteNew: () => setStatus('새 무한 게임을 시작합니다.'),
-      onContinueInfinite: () => setStatus('무한 모드 저장을 불러옵니다.'),
-      onAbandonInfinite: () => setStatus('무한 모드를 중단합니다.'),
+      onStartStageMode: () => setStatus(t('status.selectStage')),
+      onStartInfiniteMode: () => setStatus(t('status.selectInfinite')),
+      onStartStage: () => setStatus(t('status.startStage')),
+      onStartInfiniteNew: () => setStatus(t('status.startInfiniteNew')),
+      onContinueInfinite: () => setStatus(t('status.continueInfinite')),
+      onAbandonInfinite: () => setStatus(t('status.abandonInfinite')),
       onSetGridVisible: () => undefined,
-      onQuit: () => setStatus('게임 종료는 아직 준비되지 않았습니다.'),
+      onQuit: () => setStatus(t('status.quitUnavailable')),
       onSetAudioVolume: () => undefined,
     };
 
@@ -236,7 +302,7 @@
     async function exportGuestProgress() {
       const auth = window.UpUpUpAuth;
       if (!auth?.isGuest?.()) {
-        setStatus('게스트 플레이 중에만 내보낼 수 있습니다.');
+        setStatus(t('status.guestOnly'));
         return;
       }
       guestExportBtn.disabled = true;
@@ -244,9 +310,9 @@
         const text = await auth.exportGuestData();
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         downloadTextFile(`upupup-guest-save-${stamp}.json`, text);
-        setStatus('게스트 진행상황을 내보냈습니다.');
+        setStatus(t('status.exportDone'));
       } catch {
-        setStatus('게스트 진행상황 내보내기에 실패했습니다.');
+        setStatus(t('status.exportFailed'));
       } finally {
         guestExportBtn.disabled = false;
       }
@@ -255,7 +321,7 @@
     async function importGuestProgress(file) {
       const auth = window.UpUpUpAuth;
       if (!auth?.isGuest?.()) {
-        setStatus('게스트 플레이 중에만 불러올 수 있습니다.');
+        setStatus(t('status.guestOnly'));
         return;
       }
       if (!file) return;
@@ -264,9 +330,9 @@
         const text = await file.text();
         await auth.importGuestData(text);
         refreshAccountState();
-        setStatus('게스트 진행상황을 불러왔습니다.');
+        setStatus(t('status.importDone'));
       } catch {
-        setStatus('게스트 진행상황 불러오기에 실패했습니다.');
+        setStatus(t('status.importFailed'));
       } finally {
         guestImportBtn.disabled = false;
         if (guestImportFile) guestImportFile.value = '';
@@ -283,9 +349,9 @@
     }
 
     const themeItems = [
-      { id: 'default', title: '기본 황색 테마', features: ['기본', '황색'] },
-      { id: 'light', title: '라이트 테마', features: ['무료', '밝음', '흰색'] },
-      { id: 'dark', title: '다크 테마', features: ['무료', '어두움', '저자극'] },
+      { id: 'default', titleKey: 'theme.default.title', featuresKey: 'theme.default.features' },
+      { id: 'light', titleKey: 'theme.light.title', featuresKey: 'theme.light.features' },
+      { id: 'dark', titleKey: 'theme.dark.title', featuresKey: 'theme.dark.features' },
     ];
 
     function persistThemeShop() {
@@ -296,10 +362,11 @@
       if (!shopThemeGrid) return;
       shopThemeGrid.innerHTML = themeItems.map((item) => {
         const active = currentTheme === item.id;
-        const featureText = item.features.join(' · ');
+        const title = t(item.titleKey);
+        const featureText = t(item.featuresKey);
         return `
           <button class="panel-button secondary" type="button" data-theme-id="${item.id}" aria-pressed="${active}">
-            <span class="panel-button-title">${item.title}${active ? ' (적용 중)' : ''}</span>
+            <span class="panel-button-title">${title}${active ? t('theme.activeSuffix') : ''}</span>
             <span class="panel-button-desc">${featureText}</span>
           </button>
         `;
@@ -311,7 +378,7 @@
       if (!item) return;
 
       ownedThemes = Array.from(new Set([...ownedThemes, item.id]));
-      if (shopThemeStatus) shopThemeStatus.textContent = `${item.title} 적용 완료!`;
+      if (shopThemeStatus) shopThemeStatus.textContent = t('theme.applied', { title: t(item.titleKey) });
 
       applyTheme(item.id);
       persistThemeShop();
@@ -339,13 +406,13 @@
       const desc = stageClearPopup.querySelector('#stage-clear-desc');
 
       if (title) {
-        title.textContent = `스테이지 ${numberOr(stage, 1)} 클리어`;
+        title.textContent = t('stage.clear.stageTitle', { stage: numberOr(stage, 1) });
       }
       if (desc) {
-        desc.textContent = '별 3개를 모두 모아 스테이지를 완료했습니다.';
+        desc.textContent = t('stage.clear.desc');
       }
       if (stageClearRewardValue) {
-        stageClearRewardValue.textContent = `+${numberOr(reward, 0)} 크레딧`;
+        stageClearRewardValue.textContent = t('stage.clear.reward', { reward: numberOr(reward, 0) });
       }
 
       stageClearPopup.hidden = false;
@@ -353,10 +420,10 @@
 
     function setModeCardCopy() {
       if (menuPlayBtn) {
-        menuPlayBtn.setAttribute('aria-label', '일반 모드 선택');
+        menuPlayBtn.setAttribute('aria-label', t('menu.play.aria'));
       }
       if (menuContinueBtn) {
-        menuContinueBtn.setAttribute('aria-label', '무한 모드 선택');
+        menuContinueBtn.setAttribute('aria-label', t('menu.infinite.aria'));
       }
 
       const generalKicker = menuPlayBtn?.querySelector('.menu-tile-kicker');
@@ -366,16 +433,16 @@
       const infiniteTitle = menuContinueBtn?.querySelector('.menu-tile-title');
       const infiniteDesc = menuContinueBtn?.querySelector('.menu-tile-desc');
 
-      if (generalKicker) generalKicker.textContent = '일반';
-      if (generalTitle) generalTitle.textContent = '일반';
+      if (generalKicker) generalKicker.textContent = t('menu.general.kicker');
+      if (generalTitle) generalTitle.textContent = t('menu.general.title');
       if (generalDesc) {
-        generalDesc.textContent = '스테이지를 하나 선택해 바로 시작합니다.';
+        generalDesc.textContent = t('menu.general.desc');
       }
 
-      if (infiniteKicker) infiniteKicker.textContent = '무한';
-      if (infiniteTitle) infiniteTitle.textContent = '무한';
+      if (infiniteKicker) infiniteKicker.textContent = t('menu.infinite.kicker');
+      if (infiniteTitle) infiniteTitle.textContent = t('menu.infinite.title');
       if (infiniteDesc) {
-        infiniteDesc.textContent = '새 게임을 만들거나 저장된 진행에서 이어서 시작합니다.';
+        infiniteDesc.textContent = t('menu.infinite.desc');
       }
     }
 
@@ -397,9 +464,9 @@
         }
 
         button.innerHTML = `
-          <span class="stage-card-label">스테이지</span>
+          <span class="stage-card-label">${t('stage.card.label')}</span>
           <span class="stage-card-number">${String(stageNumber).padStart(2, '0')}</span>
-          <span class="stage-card-note">${locked ? '잠김' : '플레이 가능'}</span>
+          <span class="stage-card-note">${locked ? t('stage.card.locked') : t('stage.card.playable')}</span>
         `;
 
         stageGrid.appendChild(button);
@@ -412,16 +479,16 @@
       if (!Array.isArray(items)) {
         const code = error?.code || '';
         if (code.includes('permission-denied')) {
-          rankingList.innerHTML = '<li class="ranking-empty">랭킹 권한이 없어 불러올 수 없습니다. Firestore 규칙을 확인하세요.</li>';
+          rankingList.innerHTML = `<li class="ranking-empty">${t('ranking.permissionDenied')}</li>`;
         } else if (code.includes('failed-precondition')) {
-          rankingList.innerHTML = '<li class="ranking-empty">랭킹 인덱스 설정이 필요합니다. 콘솔 링크를 확인하세요.</li>';
+          rankingList.innerHTML = `<li class="ranking-empty">${t('ranking.indexRequired')}</li>`;
         } else {
-          rankingList.innerHTML = '<li class="ranking-empty">랭킹을 불러오지 못했습니다.</li>';
+          rankingList.innerHTML = `<li class="ranking-empty">${t('ranking.loadFailed')}</li>`;
         }
         return;
       }
       if (!items.length) {
-        rankingList.innerHTML = '<li class="ranking-empty">아직 등록된 기록이 없습니다.</li>';
+        rankingList.innerHTML = `<li class="ranking-empty">${t('ranking.empty')}</li>`;
         return;
       }
       rankingList.innerHTML = items.map((item) => (`<li class="ranking-item"><span>#${item.rank} ${item.nickname}</span><strong>${item.score}</strong></li>`)).join('');
@@ -430,7 +497,7 @@
     async function refreshRanking() {
       const auth = window.UpUpUpAuth;
       if (!rankingList || !auth?.getInfiniteRanking) return;
-      rankingList.innerHTML = '<li class="ranking-empty">불러오는 중...</li>';
+      rankingList.innerHTML = `<li class="ranking-empty">${t('ranking.loading')}</li>`;
       try {
         renderRanking(await auth.getInfiniteRanking(20));
       } catch (error) {
@@ -451,8 +518,8 @@
       if (!user) {
         const isGuest = Boolean(auth?.isGuest?.());
         if (rankingMyStatus) rankingMyStatus.textContent = isGuest
-          ? '게스트는 랭킹을 열람만 할 수 있습니다. 기록 등록은 Google 로그인이 필요합니다.'
-          : '로그인 후 기록을 등록할 수 있습니다.';
+          ? t('ranking.guestReadonly')
+          : t('ranking.guestStatus');
         if (rankingNicknameInput) rankingNicknameInput.disabled = true;
         if (rankingSubmitBtn) rankingSubmitBtn.disabled = true;
         if (menuLogoutBtn) menuLogoutBtn.hidden = true;
@@ -465,10 +532,10 @@
         const mine = await auth.getMyInfiniteRanking();
         if (rankingNicknameInput) rankingNicknameInput.value = mine?.nickname || user.displayName || '';
         if (rankingMyStatus) rankingMyStatus.textContent = mine
-          ? `이미 등록됨 · 최고 ${numberOr(mine.score, 0)}점 (닉네임 변경 가능)`
-          : '아직 등록 전 · 처음 등록 후에는 갱신만 가능합니다.';
+          ? t('ranking.registered', { score: numberOr(mine.score, 0) })
+          : t('ranking.notRegistered');
       } catch {
-        if (rankingMyStatus) rankingMyStatus.textContent = '내 랭킹 상태를 불러오지 못했습니다.';
+        if (rankingMyStatus) rankingMyStatus.textContent = t('ranking.myLoadFailed');
       }
     }
 
@@ -479,7 +546,7 @@
       if (rankingSyncTimer) clearTimeout(rankingSyncTimer);
       rankingSyncTimer = setTimeout(async () => {
         const record = readInfiniteBestRecord();
-        const nickname = rankingNicknameInput?.value?.trim() || user.displayName || '익명';
+        const nickname = rankingNicknameInput?.value?.trim() || user.displayName || t('name.anonymous');
         try {
           await auth.upsertInfiniteRanking({
             nickname,
@@ -525,19 +592,14 @@
         infiniteSelectPanel.hidden = !showInfinite;
       }
 
-      if (showInfinite) {
+      if (showInfinite && activeTab === 'game') {
         ensureRankingRealtimeSync();
         refreshRanking();
         syncMyRankingState();
         infiniteBestRecord = readInfiniteBestRecord();
         renderInfiniteBestHud();
-        bestScoreHud.classList.remove('is-game-hud');
-        bestScoreHud.classList.add('is-menu-hud');
-        bestScoreHud.hidden = false;
-      } else {
-        bestScoreHud.classList.remove('is-menu-hud', 'is-game-hud');
-        bestScoreHud.hidden = true;
       }
+      syncBestScoreHudVisibility();
     }
 
 
@@ -581,23 +643,28 @@
       if (nextTab === 'skin') {
         setActiveSkinTab(activeSkinTab);
       }
+
+      syncBestScoreHudVisibility();
     }
 
     function setMenuVisible(visible) {
-      menuOverlay.style.display = visible ? 'flex' : 'none';
+      menuVisible = Boolean(visible);
+      menuOverlay.style.display = menuVisible ? 'flex' : 'none';
       if (editorAccessBtn) {
-        editorAccessBtn.hidden = !visible;
+        editorAccessBtn.hidden = !menuVisible;
       }
-      if (visible) {
+      if (menuVisible) {
         setActiveTab(activeTab);
         setGameView(gameView);
+      } else {
+        syncBestScoreHudVisibility();
       }
     }
 
     function setCreditBalance(balance) {
       creditBalance = numberOr(balance, 0);
       if (menuCreditBalance) {
-        menuCreditBalance.textContent = `보유 크레딧 ${creditBalance}`;
+        menuCreditBalance.textContent = t('credits.balance', { credits: creditBalance });
       }
       renderThemeShop();
     }
@@ -615,21 +682,21 @@
 
       if (menuContinueNote) {
         menuContinueNote.textContent = hasSave
-          ? `마지막 저장 ${formatTime(saved.savedAt ?? Date.now())} | ${saved?.mode === 'stage'
-            ? `일반 ${numberOr(saved.stage, 1)}단계`
-            : '무한 모드'} | 점수 ${numberOr(saved.score, 0)}`
-          : '일반은 스테이지 선택, 무한은 새 게임 또는 이어하기를 사용합니다.';
+          ? t('menu.lastSave', { time: formatTime(saved.savedAt ?? Date.now()) })
+          : '';
       }
     }
 
-    function setGridVisible(visible) {
+    function setGridVisible(visible, { persist = true } = {}) {
       gridVisible = Boolean(visible);
       if (gridToggleBtn) {
         gridToggleBtn.innerHTML = gridVisible
-          ? '<span class="panel-button-title">격자 끄기</span><span class="panel-button-desc">맵의 격자선을 숨깁니다.</span>'
-          : '<span class="panel-button-title">격자 켜기</span><span class="panel-button-desc">맵의 격자선을 표시합니다.</span>';
+          ? `<span class="panel-button-title">${t('grid.on.title')}</span><span class="panel-button-desc">${t('grid.on.desc')}</span>`
+          : `<span class="panel-button-title">${t('grid.off.title')}</span><span class="panel-button-desc">${t('grid.off.desc')}</span>`;
       }
-      writePrefs({ autoSaveEnabled, gridVisible, audioVolume });
+      if (persist) {
+        writePrefs({ autoSaveEnabled, gridVisible, audioVolume, language });
+      }
     }
 
     function toggleGridVisible() {
@@ -640,7 +707,7 @@
 
     function setAutosaveEnabled(enabled) {
       autoSaveEnabled = Boolean(enabled);
-      writePrefs({ autoSaveEnabled, gridVisible, audioVolume });
+      writePrefs({ autoSaveEnabled, gridVisible, audioVolume, language });
     }
 
     function syncAudioVolumeUI() {
@@ -655,16 +722,25 @@
 
     function setAudioVolume(volume) {
       audioVolume = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : audioVolume));
-      writePrefs({ autoSaveEnabled, gridVisible, audioVolume });
+      writePrefs({ autoSaveEnabled, gridVisible, audioVolume, language });
       syncAudioVolumeUI();
       window.UpUpUpAudio?.getAudioManager?.()?.setVolume(audioVolume);
       actions.onSetAudioVolume(audioVolume);
     }
 
+    function setLanguage(nextLanguage) {
+      language = i18n?.setLanguage?.(nextLanguage) ?? 'ko';
+      renderStaticCopy();
+    }
+
+
     function bind() {
-      setModeCardCopy();
-      renderStageCards();
+      renderStaticCopy();
       setGameView('modes');
+
+      languageSelect?.addEventListener('change', () => {
+        setLanguage(languageSelect.value);
+      });
 
       shopThemeGrid?.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;
@@ -676,25 +752,25 @@
       editorAccessBtn?.addEventListener('click', async () => {
         const auth = window.UpUpUpAuth;
         if (!auth?.requireEditorAccess) {
-          window.alert('에디터 권한 확인 모듈을 찾을 수 없습니다.');
+          window.alert(t('editor.moduleMissing'));
           return;
         }
 
         editorAccessBtn.disabled = true;
-        editorAccessBtn.textContent = '[권한 확인 중]';
+        editorAccessBtn.textContent = t('editor.checking');
         try {
           await auth.requireEditorAccess();
           window.location.href = './editor/';
         } catch (error) {
           const code = error?.code ?? '';
           if (code.includes('editor-permission-denied')) {
-            window.alert('스테이지 에디터 권한이 없는 계정입니다. 관리자에게 권한을 요청하세요.');
+            window.alert(t('editor.denied'));
           } else {
-            window.alert('에디터 권한 확인에 실패했습니다. 다시 시도해 주세요.');
+            window.alert(t('editor.failed'));
           }
         } finally {
           editorAccessBtn.disabled = false;
-          editorAccessBtn.textContent = '[에디터 접근]';
+          editorAccessBtn.textContent = t('editor.access');
         }
       });
 
@@ -747,12 +823,12 @@
         const auth = window.UpUpUpAuth;
         const user = auth?.getUser?.();
         if (!user) {
-          setStatus('로그인이 필요합니다.');
+          setStatus(t('status.loginRequired'));
           return;
         }
 
         const record = readInfiniteBestRecord();
-        const nickname = rankingNicknameInput?.value?.trim() || user.displayName || '익명';
+        const nickname = rankingNicknameInput?.value?.trim() || user.displayName || t('name.anonymous');
         if (rankingNicknameInput && !rankingNicknameInput.value.trim()) rankingNicknameInput.value = nickname;
 
         rankingSubmitBtn.disabled = true;
@@ -762,11 +838,11 @@
             score: numberOr(record?.score, 0),
             elapsedMs: Number.isFinite(record?.elapsedMs) ? record.elapsedMs : null,
           });
-          setStatus('랭킹 기록을 등록/갱신했습니다.');
+          setStatus(t('status.rankingSaved'));
           await syncMyRankingState();
           await refreshRanking();
         } catch {
-          setStatus('랭킹 등록에 실패했습니다.');
+          setStatus(t('status.rankingFailed'));
         } finally {
           rankingSubmitBtn.disabled = false;
         }
@@ -776,12 +852,12 @@
         const auth = window.UpUpUpAuth;
         try {
           await auth?.signOut?.();
-          setStatus('로그아웃되었습니다.');
+          setStatus(t('status.logoutDone'));
           syncGuestCloudControls();
           await syncMyRankingState();
           await refreshRanking();
         } catch {
-          setStatus('로그아웃에 실패했습니다.');
+          setStatus(t('status.logoutFailed'));
         }
       });
 
@@ -790,6 +866,10 @@
       guestImportFile?.addEventListener('change', () => importGuestProgress(guestImportFile.files?.[0]));
 
       window.addEventListener('upupup:infinite-best-record-updated', scheduleRankingAutoSync);
+      window.addEventListener('upupup:language-changed', () => {
+        language = i18n?.readLanguage?.() ?? language;
+        renderStaticCopy();
+      });
       window.addEventListener('upupup:user-data-cloud-applied', refreshAccountState);
       window.addEventListener('beforeunload', () => {
         if (rankingUnsubscribe) rankingUnsubscribe();
@@ -886,7 +966,7 @@
     const savedState = storageReadSave();
     updateMenuState(savedState);
     setCreditBalance(savedState?.credits ?? window.UpUpUpShared.readCreditBalance?.() ?? 0);
-    setGridVisible(gridVisible);
+    setGridVisible(gridVisible, { persist: false });
     setAutosaveEnabled(autoSaveEnabled);
     syncAudioVolumeUI();
     renderThemeShop();
@@ -894,7 +974,7 @@
 
     return {
       getPreferences() {
-        return { autoSaveEnabled, gridVisible, audioVolume, currentTheme, ownedThemes: [...ownedThemes] };
+        return { autoSaveEnabled, gridVisible, audioVolume, language, currentTheme, ownedThemes: [...ownedThemes] };
       },
       setActions,
       setStatus,
