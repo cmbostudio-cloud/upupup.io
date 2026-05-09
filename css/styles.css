@@ -1372,10 +1372,6 @@ body {
   font: 700 14px "Courier New", monospace;
 }
 
-.infinite-select-panel .infinite-best-score-hud {
-  position: absolute;
-}
-
 .settings-logout-btn {
   justify-self: center;
   min-height: 0;
@@ -1394,8 +1390,4 @@ body {
 .settings-logout-btn:hover,
 .settings-logout-btn:focus-visible {
   color: var(--ink);
-}
-
-.infinite-select-panel {
-  position: relative;
 }

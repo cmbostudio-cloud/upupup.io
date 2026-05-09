@@ -1,4 +1,4 @@
-const CACHE_NAME = 'upupup-io-v3';
+const CACHE_NAME = 'upupup-io-v4';
 const APP_SHELL = [
   './',
   './index.html',

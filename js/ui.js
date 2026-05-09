@@ -42,12 +42,6 @@
     const skinSubpanels = Array.from(document.querySelectorAll('[data-skin-panel]'));
     const gameTitle = gamePanel?.querySelector('.menu-title');
     const menuActions = gamePanel?.querySelector('.menu-actions');
-    const menuBestScoreHud = document.createElement('div');
-    menuBestScoreHud.id = 'infinite-best-score-hud';
-    menuBestScoreHud.className = 'best-score-hud infinite-best-score-hud';
-    menuBestScoreHud.hidden = true;
-    menuBestScoreHud.setAttribute('aria-live', 'polite');
-
     const stageClearPopup = document.createElement('div');
     stageClearPopup.className = 'stage-clear-popup';
     stageClearPopup.hidden = true;
@@ -91,7 +85,6 @@
     let activeTab = 'game';
     let activeSkinTab = 'skins';
     let gameView = 'modes';
-    let infiniteBestRecord = readInfiniteBestRecord();
 
     const stageCount = 50;
 
@@ -161,18 +154,6 @@
     `;
     infiniteSelectPanel.appendChild(rankingPanel);
 
-    function renderInfiniteBestHud() {
-      const record = infiniteBestRecord ?? readInfiniteBestRecord();
-      const score = numberOr(record?.score, 0);
-      menuBestScoreHud.textContent = t('bestScore', { score });
-    }
-
-    function syncBestScoreHudVisibility() {
-      const shouldShowMenuHud = menuVisible && activeTab === 'game' && gameView === 'infinite';
-      menuBestScoreHud.hidden = !shouldShowMenuHud;
-      menuBestScoreHud.classList.toggle('is-menu-hud', shouldShowMenuHud);
-    }
-
     function renderLanguageControl() {
       if (languageSelect) {
         languageSelect.value = language;
@@ -216,7 +197,6 @@
       setModeCardCopy();
       renderStageCards();
       renderThemeShop();
-      renderInfiniteBestHud();
       setGridVisible(gridVisible, { persist: false });
       updateMenuState(storageReadSave());
       if (shopThemeStatus) shopThemeStatus.textContent = t('theme.choose');
@@ -587,8 +567,6 @@
         ensureRankingRealtimeSync();
         refreshRanking();
         syncMyRankingState();
-        infiniteBestRecord = readInfiniteBestRecord();
-        renderInfiniteBestHud();
       }
       syncBestScoreHudVisibility();
     }
@@ -635,7 +613,6 @@
         setActiveSkinTab(activeSkinTab);
       }
 
-      syncBestScoreHudVisibility();
     }
 
     function setMenuVisible(visible) {
@@ -950,8 +927,6 @@
       currentTheme = typeof nextPrefs.currentTheme === 'string' ? nextPrefs.currentTheme : 'default';
       applyTheme(currentTheme);
       renderStaticCopy();
-      infiniteBestRecord = readInfiniteBestRecord();
-      renderInfiniteBestHud();
       syncGuestCloudControls();
       syncMyRankingState();
     }
