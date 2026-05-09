@@ -1,4 +1,5 @@
 void (async () => {
+  const t = (key, values = {}) => window.UpUpUpI18n?.t?.(key, values) ?? key;
   const { ready, storageReadSave, storageDeleteSave, readCreditBalance, writeStartMode } = window.UpUpUpShared;
   await ready;
 
@@ -28,7 +29,7 @@ void (async () => {
 
   async function requireInfiniteAuth() {
     if (!auth) {
-      shell.setStatus('인증 모듈을 찾을 수 없습니다.');
+      shell.setStatus(t('status.loginRequired'));
       return false;
     }
 
@@ -36,23 +37,23 @@ void (async () => {
       await auth.waitForAuthReady?.();
       const user = await auth.promptAuthGate();
       if (!user) {
-        shell.setStatus('로그인이 필요합니다.');
+        shell.setStatus(t('status.loginRequired'));
         return false;
       }
       return true;
     } catch (error) {
       const code = error?.code ?? '';
       if (code.includes('popup-closed')) {
-        shell.setStatus('Google 인증 창이 닫혔습니다.');
+        shell.setStatus(t('auth.popupClosed'));
         shell.setGameView?.('modes');
       } else if (code.includes('unauthorized-domain')) {
-        shell.setStatus('Firebase 인증 도메인이 설정되지 않았습니다. 관리자에게 문의하세요.');
+        shell.setStatus(t('auth.unauthorizedDomain'));
       } else if (code.includes('operation-not-allowed')) {
-        shell.setStatus('Firebase 콘솔에서 Google 로그인이 비활성화되어 있습니다.');
+        shell.setStatus(t('auth.operationNotAllowed'));
       } else if (code.includes('network-request-failed')) {
-        shell.setStatus('네트워크 오류로 로그인에 실패했습니다.');
+        shell.setStatus(t('auth.networkFailed'));
       } else {
-        shell.setStatus('로그인에 실패했습니다. 다시 시도해 주세요.');
+        shell.setStatus(t('auth.failed'));
       }
 
       console.error('[InfiniteAuth] Google sign-in failed:', code, error);
@@ -64,12 +65,12 @@ void (async () => {
     const passed = await requireInfiniteAuth();
     if (!passed) return;
 
-    shell.setStatus('무한 모드를 선택하세요.');
+    shell.setStatus(t('status.selectInfinite'));
     shell.setGameView?.('infinite');
   }
 
   function startStageMode() {
-    shell.setStatus('스테이지를 선택하세요.');
+    shell.setStatus(t('status.selectStage'));
     shell.setGameView?.('stages');
   }
 
@@ -103,7 +104,7 @@ void (async () => {
     const hadInfiniteSave = storageReadSave()?.mode === 'infinite';
     const deleted = storageDeleteSave?.();
     if (!deleted) {
-      shell.setStatus('무한 모드를 포기하는 데 실패했습니다.');
+      shell.setStatus(t('status.abandonFailed'));
       return;
     }
 
@@ -113,8 +114,8 @@ void (async () => {
     shell.setGameView?.('modes');
     shell.setMenuVisible(true);
     shell.setStatus(hadInfiniteSave
-      ? '무한 모드를 포기했습니다.'
-      : '포기할 무한 모드가 없습니다.');
+      ? t('status.abandonDone')
+      : t('status.noAbandonSave'));
   }
 
   function startStage(stageNumber) {
@@ -148,10 +149,10 @@ void (async () => {
     shell.setCreditBalance(readCreditBalance());
     shell.refreshAccountState?.();
     shell.setStatus(auth.isLocalGuest?.()
-      ? '게스트 로컬 저장으로 시작합니다.'
+      ? t('status.localGuestStart')
       : auth.isGuest?.()
-        ? '게스트 클라우드 저장으로 시작합니다.'
-        : 'Google 계정으로 로그인했습니다.');
+        ? t('status.cloudGuestStart')
+        : t('status.googleStart'));
   }
 
   shell.setMenuVisible(false);
@@ -160,11 +161,11 @@ void (async () => {
       await completeInitialAuth();
     } catch (error) {
       console.warn('[CloudSave] initial auth failed:', error);
-      shell.setStatus('시작하려면 Google 로그인 또는 게스트 플레이를 선택하세요.');
+      shell.setStatus(t('status.chooseLogin'));
       try {
         await completeInitialAuth();
       } catch {
-        shell.setStatus('인증을 완료해야 게임을 시작할 수 있습니다.');
+        shell.setStatus(t('status.authRequired'));
       }
     }
   }
