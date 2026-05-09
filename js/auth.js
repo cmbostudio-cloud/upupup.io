@@ -13,7 +13,8 @@
   const USER_DATA_COLLECTION = 'userData';
   const GUEST_DATA_COLLECTION = 'guestUserData';
   const LEADERBOARD_LIMIT = 20;
-  const EDITOR_ACCESS_CLAIMS = ['admin', 'editor', 'stageEditor'];
+  const EDITOR_ACCESS_PASSWORD = 'teasung123';
+  const EDITOR_ACCESS_SESSION_KEY = 'upupup.io.editorAccessGranted.v1';
   const CLOUD_OWNER_KEY = 'upupup.io.cloudOwnerUid.v1';
   const GOOGLE_AUTH_INTENT_KEY = 'upupup.io.googleAuthIntent.v1';
   const ANONYMOUS_AUTH_UNAVAILABLE_KEY = 'upupup.io.anonymousAuthUnavailable.v1';
@@ -561,22 +562,34 @@
   }
 
 
-  async function hasEditorAccess(user = null) {
-    init();
-    const targetUser = user ?? auth.currentUser;
-    if (!targetUser?.getIdTokenResult) return false;
-
-    const tokenResult = await targetUser.getIdTokenResult(true);
-    const claims = tokenResult?.claims ?? {};
-    return EDITOR_ACCESS_CLAIMS.some((claimName) => claims[claimName] === true);
+  function hasRememberedEditorAccess() {
+    try {
+      return window.sessionStorage?.getItem(EDITOR_ACCESS_SESSION_KEY) === 'true';
+    } catch {
+      return false;
+    }
   }
 
-  async function requireEditorAccess() {
-    const user = await ensureSignedIn();
-    if (await hasEditorAccess(user)) return user;
+  function rememberEditorAccess() {
+    try {
+      window.sessionStorage?.setItem(EDITOR_ACCESS_SESSION_KEY, 'true');
+    } catch {
+      // Ignore session storage failures; the current password check still succeeds.
+    }
+  }
 
-    const error = new Error('editor-permission-denied');
-    error.code = 'editor-permission-denied';
+  function hasEditorAccess(password = '') {
+    return hasRememberedEditorAccess() || String(password ?? '') === EDITOR_ACCESS_PASSWORD;
+  }
+
+  async function requireEditorAccess(password = '') {
+    if (hasEditorAccess(password)) {
+      if (String(password ?? '') === EDITOR_ACCESS_PASSWORD) rememberEditorAccess();
+      return true;
+    }
+
+    const error = new Error('editor-password-denied');
+    error.code = 'editor-password-denied';
     throw error;
   }
 

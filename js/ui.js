@@ -137,12 +137,6 @@
     infiniteAbandonBtn.className = 'infinite-abandon-btn';
     infiniteAbandonBtn.textContent = t('infinite.abandon');
 
-    const menuBestScoreHud = document.createElement('div');
-    menuBestScoreHud.id = 'best-score-hud';
-    menuBestScoreHud.className = 'best-score-hud is-menu-hud';
-    menuBestScoreHud.hidden = true;
-    menuBestScoreHud.setAttribute('aria-live', 'polite');
-
     infiniteSelectPanel.appendChild(infiniteAbandonBtn);
 
     const rankingPanel = document.createElement('div');
@@ -215,7 +209,7 @@
       gamePanel.append(stageSelectPanel, infiniteSelectPanel);
     }
 
-    document.body.append(stageClearPopup, abandonWarningPopup, menuBestScoreHud);
+    document.body.append(stageClearPopup, abandonWarningPopup);
 
     const stageBackBtn = stageSelectPanel.querySelector('#stage-back-btn');
     const stageGrid = stageSelectPanel.querySelector('#stage-grid');
@@ -489,18 +483,6 @@
       rankingUnsubscribe = auth.subscribeInfiniteRanking((items, error) => renderRanking(items, error), 20);
     }
 
-    function syncBestScoreHudVisibility() {
-      if (!menuBestScoreHud) return;
-      const shouldShow = menuVisible && activeTab === 'game' && gameView === 'infinite';
-      menuBestScoreHud.hidden = !shouldShow;
-      if (!shouldShow) return;
-
-      const record = readInfiniteBestRecord();
-      menuBestScoreHud.classList.remove('is-game-hud');
-      menuBestScoreHud.classList.add('is-menu-hud');
-      menuBestScoreHud.textContent = t('record', { score: numberOr(record?.score, 0) });
-    }
-
     async function syncMyRankingState() {
       const auth = window.UpUpUpAuth;
       const user = auth?.getUser?.();
@@ -586,9 +568,7 @@
         refreshRanking();
         syncMyRankingState();
       }
-      syncBestScoreHudVisibility();
     }
-
 
     function setActiveSkinTab(tabName) {
       const nextTab = skinSubpanels.some((panel) => panel.dataset.skinPanel === tabName)
@@ -642,8 +622,6 @@
       if (menuVisible) {
         setActiveTab(activeTab);
         setGameView(gameView);
-      } else {
-        syncBestScoreHudVisibility();
       }
     }
 
@@ -742,15 +720,18 @@
           return;
         }
 
+        const password = window.prompt(t('editor.passwordPrompt'));
+        if (password == null) return;
+
         editorAccessBtn.disabled = true;
         editorAccessBtn.textContent = t('editor.checking');
         try {
-          await auth.requireEditorAccess();
+          await auth.requireEditorAccess(password);
           window.location.href = './editor/';
         } catch (error) {
           const code = error?.code ?? '';
-          if (code.includes('editor-permission-denied')) {
-            window.alert(t('editor.denied'));
+          if (code.includes('editor-password-denied')) {
+            window.alert(t('editor.passwordDenied'));
           } else {
             window.alert(t('editor.failed'));
           }
@@ -853,7 +834,6 @@
 
       window.addEventListener('upupup:infinite-best-record-updated', () => {
         scheduleRankingAutoSync();
-        syncBestScoreHudVisibility();
       });
       window.addEventListener('upupup:language-changed', () => {
         language = i18n?.readLanguage?.() ?? language;
