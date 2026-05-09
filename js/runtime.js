@@ -129,15 +129,6 @@
       gameExitBtn.textContent = t('game.exit');
       gameExitBtn.setAttribute('aria-label', t('game.exit.aria'));
     }
-    let bestScoreHud = document.getElementById('best-score-hud');
-    if (!bestScoreHud) {
-      bestScoreHud = document.createElement('div');
-      bestScoreHud.id = 'best-score-hud';
-      bestScoreHud.className = 'best-score-hud';
-      bestScoreHud.hidden = true;
-      bestScoreHud.setAttribute('aria-live', 'polite');
-      document.body.appendChild(bestScoreHud);
-    }
     let creditHud = null;
     let bestRecord = { score: 0, elapsedMs: null, savedAt: 0 };
 
@@ -236,18 +227,6 @@
         multiplierText.x = CANVAS_W / 2;
         multiplierText.y = scoreText ? scoreText.y + scoreText.height - 6 : 48;
       }
-    }
-
-    function updateBestScoreHud() {
-      if (!bestScoreHud) return;
-      if (gameMode !== 'infinite') {
-        bestScoreHud.hidden = true;
-        return;
-      }
-      bestScoreHud.hidden = false;
-      bestScoreHud.classList.remove('is-menu-hud');
-      bestScoreHud.classList.add('is-game-hud');
-      bestScoreHud.textContent = t('record', { score: bestRecord.score });
     }
 
     function ensureCreditHud() {
@@ -356,7 +335,6 @@
             savedAt: Date.now(),
           };
           void writeInfiniteBestRecord(bestRecord);
-          updateBestScoreHud();
         }
         layoutScoreHud();
       }
@@ -553,8 +531,6 @@
     if (promoteInitialSave) {
       void writeInfiniteBestRecord(bestRecord);
     }
-    updateBestScoreHud();
-
     player = new Square(
       {
         PIXI,

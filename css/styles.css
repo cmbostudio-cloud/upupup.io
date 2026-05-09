@@ -86,50 +86,6 @@ body {
   touch-action: none;
 }
 
-.editor-access-btn {
-  position: fixed;
-  top: max(14px, env(safe-area-inset-top));
-  right: max(14px, env(safe-area-inset-right));
-  z-index: 80;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--ink);
-  font-family: "Courier New", monospace;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  text-decoration: none;
-  transition: transform 140ms ease, color 140ms ease;
-  touch-action: manipulation;
-}
-
-.editor-access-btn:hover,
-.editor-access-btn:focus-visible {
-  transform: translateY(-1px);
-  color: rgba(var(--ink-rgb), 0.72);
-  text-decoration: underline;
-  text-underline-offset: 0.18em;
-}
-
-.editor-access-btn:active {
-  transform: translateY(0);
-}
-
-@media (max-width: 640px) {
-  .editor-access-btn {
-    top: max(10px, env(safe-area-inset-top));
-    right: max(10px, env(safe-area-inset-right));
-    font-size: 13px;
-    padding: 10px;
-  }
-}
-
 .game-exit-btn {
   position: fixed;
   top: max(14px, env(safe-area-inset-top));
@@ -166,32 +122,6 @@ body {
 
 .game-exit-btn:active {
   transform: translateY(0);
-}
-
-.best-score-hud {
-  position: fixed;
-  top: max(44px, calc(env(safe-area-inset-top) + 28px));
-  right: max(14px, env(safe-area-inset-right));
-  z-index: 70;
-  color: var(--ink);
-  font-family: "Courier New", monospace;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: 0.02em;
-  text-align: right;
-  white-space: nowrap;
-  pointer-events: none;
-  text-shadow: 0 1px 0 rgba(248, 243, 234, 0.88);
-}
-
-.best-score-hud.is-menu-hud {
-  top: max(64px, calc(env(safe-area-inset-top) + 50px));
-  right: clamp(14px, 18vw, 360px);
-}
-
-.best-score-hud.is-game-hud {
-  top: max(44px, calc(env(safe-area-inset-top) + 28px));
 }
 
 .credit-hud {
@@ -1158,10 +1088,6 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .best-score-hud {
-    top: max(58px, calc(env(safe-area-inset-top) + 44px));
-  }
-
   .mode-select-panel .infinite-abandon-btn {
     font-size: 14px;
     margin-top: 4px;
@@ -1353,10 +1279,6 @@ body {
   min-height: 44px;
 }
 
-.settings-logout-btn {
-  min-height: 72px;
-}
-
 .language-control {
   cursor: default;
 }
@@ -1372,7 +1294,8 @@ body {
   font: 700 14px "Courier New", monospace;
 }
 
-.settings-logout-btn {
+.settings-logout-btn,
+.settings-editor-access-btn {
   justify-self: center;
   min-height: 0;
   margin-top: 4px;
@@ -1388,6 +1311,8 @@ body {
 }
 
 .settings-logout-btn:hover,
-.settings-logout-btn:focus-visible {
+.settings-logout-btn:focus-visible,
+.settings-editor-access-btn:hover,
+.settings-editor-access-btn:focus-visible {
   color: var(--ink);
 }
