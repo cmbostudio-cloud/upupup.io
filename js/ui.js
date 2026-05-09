@@ -137,6 +137,7 @@
     infiniteAbandonBtn.className = 'infinite-abandon-btn';
     infiniteAbandonBtn.textContent = t('infinite.abandon');
     infiniteSelectPanel.appendChild(infiniteAbandonBtn);
+    infiniteSelectPanel.appendChild(menuBestScoreHud);
 
     const rankingPanel = document.createElement('div');
     rankingPanel.className = 'infinite-ranking-panel';
@@ -567,6 +568,7 @@
         refreshRanking();
         syncMyRankingState();
       }
+      syncBestScoreHudVisibility();
     }
 
 
@@ -622,6 +624,8 @@
       if (menuVisible) {
         setActiveTab(activeTab);
         setGameView(gameView);
+      } else {
+        syncBestScoreHudVisibility();
       }
     }
 
