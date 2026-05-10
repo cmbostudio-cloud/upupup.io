@@ -131,6 +131,8 @@
     const user = result?.user ?? auth.currentUser;
     if (!user || user.isAnonymous) return null;
 
+    await resetLocalStateForIdentitySwitch(user.uid);
+
     const isNewUser = Boolean(result?.additionalUserInfo?.isNewUser);
     // Do not pre-read userData here: projects that have not deployed the
     // userData Firestore rules yet would surface a permission error before
@@ -252,8 +254,10 @@
       await auth.signOut();
     }
     if (!ENABLE_GUEST_CLOUD_AUTH) {
+      await resetLocalStateForIdentitySwitch('local-guest');
       isGuestSession = true;
       isLocalGuestSession = true;
+      setStoredCloudOwner('local-guest');
       return createLocalGuestUser();
     }
     if (auth.currentUser?.isAnonymous) {
@@ -396,6 +400,25 @@
   }
 
 
+  
+  function getStoredCloudOwner() {
+    try { return localStorage.getItem(CLOUD_OWNER_KEY); } catch { return null; }
+  }
+
+  function setStoredCloudOwner(uid) {
+    try {
+      if (uid) localStorage.setItem(CLOUD_OWNER_KEY, uid);
+      else localStorage.removeItem(CLOUD_OWNER_KEY);
+    } catch { /* ignore */ }
+  }
+
+  async function resetLocalStateForIdentitySwitch(nextOwnerUid) {
+    const currentOwnerUid = getStoredCloudOwner();
+    if (!currentOwnerUid || currentOwnerUid === nextOwnerUid) return false;
+    await clearLocalUserData();
+    return true;
+  }
+
   function getShared() {
     return window.UpUpUpShared ?? null;
   }
@@ -442,7 +465,7 @@
     await shared.writeStageProgress?.({ maxUnlockedStage: 1 }, { skipCloudSync: true, replace: true });
     shared.writeThemeShop?.({ ownedThemes: ['default'], currentTheme: 'default' }, { skipCloudSync: true });
     shared.writePrefs?.({ autoSaveEnabled: true, gridVisible: true, audioVolume: 0.8 }, { skipCloudSync: true });
-    try { localStorage.removeItem(CLOUD_OWNER_KEY); } catch { /* ignore */ }
+    setStoredCloudOwner(null);
     window.dispatchEvent(new CustomEvent('upupup:user-data-cloud-applied', { detail: { cleared: true } }));
   }
 
@@ -510,7 +533,7 @@
     } else {
       await pushUserCloudData(user);
     }
-    try { localStorage.setItem(CLOUD_OWNER_KEY, user.uid); } catch { /* ignore */ }
+    setStoredCloudOwner(user.uid);
     return true;
   }
 
