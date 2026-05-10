@@ -263,22 +263,10 @@ body {
 }
 
 .skin-subtab-button {
-  min-height: 44px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
-  font-family: Impact, Haettenschweiler, "Arial Black", sans-serif;
-  font-size: clamp(16px, 2vw, 22px);
-  letter-spacing: 0.04em;
-  transition: background 160ms ease, transform 160ms ease;
-}
-
-.skin-subtab-button:hover,
-.skin-subtab-button:focus-visible {
-  background: var(--surface-hover);
-  transform: translateY(-1px);
+  min-height: 64px;
+  font-family: "Courier New", monospace;
+  font-size: clamp(16px, 1.7vw, 20px);
+  letter-spacing: 0.05em;
 }
 
 .skin-subtab-button[aria-selected="true"] {
