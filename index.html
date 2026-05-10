@@ -21,9 +21,9 @@
 
 <body>
   <canvas id="game-canvas"></canvas>
-  <button id="game-exit-btn" class="game-exit-btn" type="button" hidden aria-label="게임 종료">
+  <button id="game-exit-btn" class="game-exit-btn" type="button" hidden aria-label="게임 종료" data-i18n-aria-label="game.exit.aria">
     <span class="game-exit-icon" aria-hidden="true">X</span>
-    <span class="game-exit-label">종료</span>
+    <span class="game-exit-label" data-i18n="game.exit">× 종료</span>
   </button>
   <div id="menu-overlay" role="dialog" aria-label="Main menu">
     <div class="menu-tablist" role="tablist" aria-label="Main menu tabs">
@@ -93,23 +93,23 @@
             <div class="menu-actions">
               <button id="menu-play-btn" class="menu-tile" type="button" aria-label="새 게임 시작" data-variant="play">
                 <div class="menu-tile-head">
-                  <span class="menu-tile-kicker">START</span>
+                <span class="menu-tile-kicker" data-i18n="menu.general.kicker">일반</span>
                   <span class="menu-tile-arrow" aria-hidden="true"></span>
                 </div>
-                <span class="menu-tile-title">새 게임</span>
-                <span class="menu-tile-desc">처음부터 다시 시작합니다. 기록이 없다면 이 버튼으로 플레이를 시작하세요.</span>
+                <span class="menu-tile-title" data-i18n="menu.general.title">일반</span>
+                <span class="menu-tile-desc" data-i18n="menu.general.desc">스테이지를 하나 선택해 바로 시작합니다.</span>
               </button>
               <button id="menu-continue-btn" class="menu-tile" type="button" aria-label="저장된 게임 이어하기"
                 data-variant="continue">
                 <div class="menu-tile-head">
-                  <span class="menu-tile-kicker">CONTINUE</span>
+                  <span class="menu-tile-kicker" data-i18n="menu.infinite.kicker">무한</span>
                   <span class="menu-tile-arrow" aria-hidden="true"></span>
                 </div>
-                <span class="menu-tile-title">이어하기</span>
-                <span class="menu-tile-desc">마지막 저장 지점에서 계속합니다.</span>
+                <span class="menu-tile-title" data-i18n="menu.infinite.title">무한</span>
+                <span class="menu-tile-desc" data-i18n="menu.infinite.desc">새 게임을 만들거나 저장된 진행에서 이어서 시작합니다.</span>
               </button>
             </div>
-            <p id="menu-continue-note" class="menu-note">저장된 진행이 있으면 이어하기 버튼이 활성화됩니다.</p>
+            <p id="menu-continue-note" class="menu-note" data-i18n="menu.continueHint">저장된 진행이 있으면 이어하기 버튼이 활성화됩니다.</p>
           </div>
         </section>
 
@@ -120,8 +120,8 @@
             <h2 class="menu-panel-title" data-i18n="settings.title">설정</h2>
             <div id="settings-panel" class="menu-settings-grid">
               <button id="grid-toggle-btn" class="panel-button secondary" type="button">
-                <span class="panel-button-title">격자</span>
-                <span class="panel-button-desc">맵의 격자선을 켜고 끕니다. 화면 구성을 확인하기 좋습니다.</span>
+                <span class="panel-button-title" data-i18n="grid.on.title">격자 끄기</span>
+                <span class="panel-button-desc" data-i18n="grid.on.desc">맵의 격자선을 숨깁니다.</span>
               </button>
               <label id="language-control" class="language-control panel-button secondary" for="language-select">
                 <span id="language-label" class="panel-button-title">언어</span>
