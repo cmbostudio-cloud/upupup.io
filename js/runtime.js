@@ -601,26 +601,31 @@
     multiplierText.anchor.set(0.5, 0);
     uiLayer.addChild(multiplierText);
     if (gameMode === 'stage') {
+      const stageHudX = 14;
+      const stageHudY = 72;
+      const stageHudGap = 14;
       modeText = new PIXI.Text(t('stage.name', { stage: gameStage }), {
         fontFamily: getHudFontFamily(),
-        fontSize: 16,
+        fontSize: 18,
         fill: themePalette.inkSoft ?? 0x1a1a1a,
         fontWeight: '700',
+        lineHeight: 24,
       });
       modeText.anchor.set(0, 0);
-      modeText.x = 14;
-      modeText.y = 86;
+      modeText.x = stageHudX;
+      modeText.y = stageHudY;
       uiLayer.addChild(modeText);
 
       stageStarText = new PIXI.Text(t('stars', { collected: 0, total: 3 }), {
         fontFamily: getHudFontFamily(),
-        fontSize: 20,
+        fontSize: 18,
         fill: themePalette.inkSoft ?? 0x1a1a1a,
         fontWeight: '700',
+        lineHeight: 24,
       });
       stageStarText.anchor.set(0, 0);
-      stageStarText.x = 14;
-      stageStarText.y = modeText.y + modeText.height + 18;
+      stageStarText.x = stageHudX;
+      stageStarText.y = stageHudY + 24 + stageHudGap;
       uiLayer.addChild(stageStarText);
       updateStageStarText();
       if (stageStarTotal > 0 && stageStarsCollected >= stageStarTotal) {
