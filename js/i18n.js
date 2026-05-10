@@ -153,6 +153,7 @@
       'game.exit': '× 종료',
       'game.exit.aria': '게임 종료',
       'creditHud': '크레딧 {credits}',
+      'credit.multiplier': '크레딧 보너스: ×{value}',
     },
     en: {
       'language.label': 'Language',
@@ -304,6 +305,7 @@
       'game.exit': '× Exit',
       'game.exit.aria': 'Exit game',
       'creditHud': 'Credits {credits}',
+      'credit.multiplier': 'Credit bonus: ×{value}',
     },
   };
 

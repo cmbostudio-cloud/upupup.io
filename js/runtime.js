@@ -329,7 +329,7 @@
         score = current;
         scoreText.text = String(score);
         if (multiplierText) {
-          multiplierText.text = `x${getCreditValue(score)}`;
+          multiplierText.text = t('credit.multiplier', { value: getCreditValue(score) });
         }
         if (gameMode === 'infinite' && score > bestRecord.score) {
           bestRecord = {
@@ -592,7 +592,7 @@
     scoreText.anchor.set(0.5, 0);
     uiLayer.addChild(scoreText);
 
-    multiplierText = new PIXI.Text('x1', {
+    multiplierText = new PIXI.Text(t('credit.multiplier', { value: 1 }), {
       fontFamily: getHudFontFamily(),
       fontSize: 16,
       fill: themePalette.inkSoft ?? 0x1a1a1a,

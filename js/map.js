@@ -113,6 +113,17 @@
     const WINDMILL_CHANCE_BASE = 0.05;
     const WINDMILL_CHANCE_MAX = 0.22;
     const WINDMILL_DENSITY_SCORE = 30;
+    const INFINITE_DIFFICULTY_MILESTONES = [100, 250, 500, 1000];
+
+    function getInfiniteDifficultyTier(y) {
+      if (mode !== 'infinite') return 0;
+      const estimatedScore = Math.max(0, Math.floor((GROUND_Y - y) / GRID));
+      let tier = 0;
+      for (const milestone of INFINITE_DIFFICULTY_MILESTONES) {
+        if (estimatedScore >= milestone) tier += 1;
+      }
+      return tier;
+    }
 
     let nextSpawnY = GROUND_Y - 780;
     let pathX = Math.round(MAP_W * (0.35 + rng.next() * 0.3));
@@ -917,6 +928,17 @@
     let movingStickCooldown = 0;
     let windmillCooldown = 0;
 
+    function getAccentPlan(y) {
+      const tier = getInfiniteDifficultyTier(y);
+      return {
+        tier,
+        movingStickChance: clamp(MOVING_STICK_CHANCE + tier * 0.08, 0, 0.72),
+        windmillChance: clamp(getWindmillSpawnChance(y) + tier * 0.06, 0, 0.8),
+        sideStickChance: clamp(Math.max(0.02, SIDE_STICK_CHANCE - tier * 0.02), 0.02, 0.16),
+        movingStickCooldownBase: Math.max(1, 2 - Math.floor(tier / 2)),
+      };
+    }
+
     function addSpawnStep(y) {
       const mainStickWidth = STICK_LENGTH;
       const mainStickX = spawnRandomStick(y, mainStickWidth, STICK_HEIGHT);
@@ -935,27 +957,28 @@
 
       let spawnedAccent = false;
       const windmillProgress = getWindmillProgress(y);
+      const accentPlan = getAccentPlan(y);
 
-      if (movingStickCooldown === 0 && rng.next() < MOVING_STICK_CHANCE) {
+      if (movingStickCooldown === 0 && rng.next() < accentPlan.movingStickChance) {
         spawnRandomMovingStick(
           y - randRange(150, 210),
           Math.round(STICK_LENGTH * randRange(0.58, 0.78)),
           STICK_HEIGHT
         );
-        movingStickCooldown = 2;
+        movingStickCooldown = accentPlan.movingStickCooldownBase;
         spawnedAccent = true;
-      } else if (windmillCooldown === 0 && rng.next() < getWindmillSpawnChance(y)) {
+      } else if (windmillCooldown === 0 && rng.next() < accentPlan.windmillChance) {
         const windmillY = y - randRange(110, 170);
         spawnRandomWindmill(windmillY, randRange(0.92, 1.08));
         windmillCooldown = getWindmillCooldown(y);
         spawnedAccent = true;
 
-        if (windmillProgress > 0.55 && rng.next() < (windmillProgress - 0.55) * 0.75) {
+        if (windmillProgress > 0.55 && rng.next() < clamp((windmillProgress - 0.55) * 0.75 + accentPlan.tier * 0.08, 0, 0.95)) {
           spawnRandomWindmill(windmillY - randRange(70, 120), randRange(0.86, 1.02));
         }
       }
 
-      if (!spawnedAccent && rng.next() < SIDE_STICK_CHANCE) {
+      if (!spawnedAccent && rng.next() < accentPlan.sideStickChance) {
         addSideStick(
           y - randRange(100, 160),
           Math.round(STICK_LENGTH * randRange(0.82, 1)),
