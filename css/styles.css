@@ -138,14 +138,14 @@ body {
 
 .credit-hud {
   position: fixed;
-  top: max(38px, calc(env(safe-area-inset-top) + 24px));
+  top: max(34px, calc(env(safe-area-inset-top) + 20px));
   left: max(14px, env(safe-area-inset-left));
   z-index: 70;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 24px;
   letter-spacing: 0.02em;
   text-shadow: 0 1px 0 rgba(248, 243, 234, 0.88);
   pointer-events: none;

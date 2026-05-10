@@ -602,7 +602,7 @@
     uiLayer.addChild(multiplierText);
     if (gameMode === 'stage') {
       const stageHudX = 14;
-      const stageHudY = 86;
+      const stageHudY = 72;
       const stageHudGap = 14;
       modeText = new PIXI.Text(t('stage.name', { stage: gameStage }), {
         fontFamily: getHudFontFamily(),
