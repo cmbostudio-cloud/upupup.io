@@ -2,6 +2,9 @@
   const t = (key, values = {}) => window.UpUpUpI18n?.t?.(key, values) ?? key;
   const { Square } = window.UpUpUpLogic;
   const { buildMap } = window.UpUpUpMap;
+  const getHudFontFamily = () => (window.UpUpUpI18n?.readLanguage?.() === 'ko'
+    ? 'Pretendard, Noto Sans KR, Apple SD Gothic Neo, sans-serif'
+    : 'Montserrat, Avenir Next, Segoe UI, Arial, sans-serif');
   const {
     getViewportSize,
     clamp,
@@ -581,7 +584,7 @@
     }
 
     scoreText = new PIXI.Text('0', {
-      fontFamily: 'Courier New',
+      fontFamily: getHudFontFamily(),
       fontSize: 42,
       fill: themePalette.ink ?? 0x111111,
       fontWeight: '900',
@@ -590,7 +593,7 @@
     uiLayer.addChild(scoreText);
 
     multiplierText = new PIXI.Text('x1', {
-      fontFamily: 'Courier New',
+      fontFamily: getHudFontFamily(),
       fontSize: 16,
       fill: themePalette.inkSoft ?? 0x1a1a1a,
       fontWeight: '700',
@@ -599,25 +602,25 @@
     uiLayer.addChild(multiplierText);
     if (gameMode === 'stage') {
       modeText = new PIXI.Text(t('stage.name', { stage: gameStage }), {
-        fontFamily: 'Courier New',
+        fontFamily: getHudFontFamily(),
         fontSize: 16,
         fill: themePalette.inkSoft ?? 0x1a1a1a,
         fontWeight: '700',
       });
       modeText.anchor.set(0, 0);
       modeText.x = 14;
-      modeText.y = 40;
+      modeText.y = 86;
       uiLayer.addChild(modeText);
 
       stageStarText = new PIXI.Text(t('stars', { collected: 0, total: 3 }), {
-        fontFamily: 'Courier New',
+        fontFamily: getHudFontFamily(),
         fontSize: 20,
         fill: themePalette.inkSoft ?? 0x1a1a1a,
         fontWeight: '700',
       });
       stageStarText.anchor.set(0, 0);
       stageStarText.x = 14;
-      stageStarText.y = 84;
+      stageStarText.y = modeText.y + modeText.height + 18;
       uiLayer.addChild(stageStarText);
       updateStageStarText();
       if (stageStarTotal > 0 && stageStarsCollected >= stageStarTotal) {
