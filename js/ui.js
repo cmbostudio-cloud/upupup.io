@@ -398,19 +398,10 @@
       }
 
       const generalTitle = menuPlayBtn?.querySelector('.menu-tile-title');
-      const generalDesc = menuPlayBtn?.querySelector('.menu-tile-desc');
       const infiniteTitle = menuContinueBtn?.querySelector('.menu-tile-title');
-      const infiniteDesc = menuContinueBtn?.querySelector('.menu-tile-desc');
 
       if (generalTitle) generalTitle.textContent = t('menu.general.title');
-      if (generalDesc) {
-        generalDesc.textContent = t('menu.general.desc');
-      }
-
       if (infiniteTitle) infiniteTitle.textContent = t('menu.infinite.title');
-      if (infiniteDesc) {
-        infiniteDesc.textContent = t('menu.infinite.desc');
-      }
     }
 
     function renderStageCards() {
