@@ -397,24 +397,11 @@
         menuContinueBtn.setAttribute('aria-label', t('menu.infinite.aria'));
       }
 
-      const generalKicker = menuPlayBtn?.querySelector('.menu-tile-kicker');
       const generalTitle = menuPlayBtn?.querySelector('.menu-tile-title');
-      const generalDesc = menuPlayBtn?.querySelector('.menu-tile-desc');
-      const infiniteKicker = menuContinueBtn?.querySelector('.menu-tile-kicker');
       const infiniteTitle = menuContinueBtn?.querySelector('.menu-tile-title');
-      const infiniteDesc = menuContinueBtn?.querySelector('.menu-tile-desc');
 
-      if (generalKicker) generalKicker.textContent = t('menu.general.kicker');
       if (generalTitle) generalTitle.textContent = t('menu.general.title');
-      if (generalDesc) {
-        generalDesc.textContent = t('menu.general.desc');
-      }
-
-      if (infiniteKicker) infiniteKicker.textContent = t('menu.infinite.kicker');
       if (infiniteTitle) infiniteTitle.textContent = t('menu.infinite.title');
-      if (infiniteDesc) {
-        infiniteDesc.textContent = t('menu.infinite.desc');
-      }
     }
 
     function renderStageCards() {
