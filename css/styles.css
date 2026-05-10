@@ -282,7 +282,7 @@ body {
 
 .skin-subtab-button[aria-selected="true"] {
   background: var(--surface-selected);
-  box-shadow: inset 0 0 0 2px var(--line);
+  border-color: var(--ink);
 }
 
 .skin-subpanel {
@@ -442,7 +442,7 @@ body {
 }
 
 .menu-actions .menu-tile-title {
-  font-size: clamp(42px, 5.2vw, 74px);
+  font-size: clamp(31px, 3.9vw, 56px);
 }
 
 .menu-tile {
@@ -483,6 +483,12 @@ body {
   transform: none;
 }
 
+.menu-tile-copy {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
 .menu-tile-head {
   display: contents;
 }
@@ -520,9 +526,18 @@ body {
 .menu-tile-title {
   display: block;
   font-family: var(--font-display);
-  font-size: clamp(24px, 3vw, 34px);
+  font-size: clamp(18px, 2.25vw, 26px);
   line-height: 0.96;
   letter-spacing: 0.01em;
+  transform: translateY(-6px);
+}
+
+.menu-tile-desc {
+  display: block;
+  font-size: clamp(12px, 1.25vw, 15px);
+  line-height: 1.35;
+  color: rgba(var(--ink-rgb), 0.72);
+  max-width: 30ch;
 }
 
 
