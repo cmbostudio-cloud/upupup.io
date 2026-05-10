@@ -278,11 +278,17 @@ body {
   display: grid;
   place-items: center;
   text-align: center;
+  background: var(--surface);
 }
 
 .skin-subtab-button[aria-selected="true"] {
   background: var(--surface-selected);
   border-color: var(--ink);
+}
+
+.skin-subtab-button[aria-selected="false"] {
+  background: var(--surface);
+  border-color: var(--line);
 }
 
 .skin-subpanel {
