@@ -249,10 +249,13 @@
   }
 
   function formatTime(timestamp) {
-    return new Date(timestamp).toLocaleTimeString([], {
+    const language = window.UpUpUpI18n?.readLanguage?.() || readPrefs().language || 'ko';
+    const locale = language === 'en' ? 'en-US' : 'ko-KR';
+    return new Date(timestamp).toLocaleTimeString(locale, {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
+      hour12: false,
     });
   }
 
