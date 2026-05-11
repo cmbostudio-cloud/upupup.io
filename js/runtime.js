@@ -133,6 +133,7 @@
       gameExitBtn.setAttribute('aria-label', t('game.exit.aria'));
     }
     let creditHud = null;
+    let bestHud = null;
     let bestRecord = { score: 0, elapsedMs: null, savedAt: 0 };
 
     const currentTheme = shell.getPreferences?.().currentTheme;
@@ -233,6 +234,17 @@
     }
 
     function ensureCreditHud() {
+      if (!bestHud) {
+        bestHud = document.getElementById('best-hud');
+        if (!bestHud) {
+          bestHud = document.createElement('div');
+          bestHud.id = 'best-hud';
+          bestHud.className = 'credit-hud best-hud';
+          bestHud.hidden = true;
+          bestHud.setAttribute('aria-live', 'polite');
+          document.body.appendChild(bestHud);
+        }
+      }
       if (!creditHud) {
         creditHud = document.getElementById('credit-hud');
         if (!creditHud) {
@@ -340,11 +352,18 @@
           void writeInfiniteBestRecord(bestRecord);
         }
         layoutScoreHud();
+        updateCreditText();
       }
     }
 
     function updateCreditText() {
       ensureCreditHud();
+      if (bestHud) {
+        bestHud.hidden = gameMode !== 'infinite';
+        if (gameMode === 'infinite') {
+          bestHud.textContent = t('bestHud', { score: Math.max(0, Math.floor(Number(bestRecord?.score) || 0)) });
+        }
+      }
       if (!creditHud) return;
       creditHud.hidden = false;
       creditHud.textContent = t('creditHud', { credits: creditBalance });
@@ -747,8 +766,6 @@
 
   window.UpUpUpRuntime = { startGame };
 })();
-
-
 
 
 

@@ -151,6 +151,10 @@ body {
   pointer-events: none;
 }
 
+.best-hud {
+  top: max(10px, calc(env(safe-area-inset-top) + 2px));
+}
+
 #menu-overlay {
   position: fixed;
   inset: 0;
