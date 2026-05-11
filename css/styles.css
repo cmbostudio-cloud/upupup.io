@@ -223,6 +223,41 @@ body {
   padding-bottom: clamp(104px, 14vh, 142px);
 }
 
+
+.shop-draw-grid {
+  width: min(560px, 100%);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.shop-draw-card {
+  background: var(--surface);
+  border: 2px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.shop-draw-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(18px, 1.9vw, 22px);
+  letter-spacing: 0.04em;
+}
+
+.shop-draw-price {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.shop-draw-button[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 .shop-theme-grid {
   display: grid;
   width: 100%;
@@ -304,6 +339,18 @@ body {
 
 .skin-subpanel[hidden] {
   display: none;
+}
+
+.menu-panel-shop {
+  justify-items: center;
+  align-content: start;
+  gap: 18px;
+  text-align: center;
+}
+
+.menu-panel-shop > .menu-panel-title {
+  justify-self: center;
+  text-align: center;
 }
 
 .menu-panel-settings {
