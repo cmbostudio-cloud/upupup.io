@@ -153,6 +153,7 @@
       'game.exit': '× 종료',
       'game.exit.aria': '게임 종료',
       'creditHud': '크레딧 {credits}',
+      'bestHud': '최고 기록 {score}',
       'credit.multiplier': '크레딧 보너스: ×{value}',
     },
     en: {
@@ -305,6 +306,7 @@
       'game.exit': '× Exit',
       'game.exit.aria': 'Exit game',
       'creditHud': 'Credits {credits}',
+      'bestHud': 'Best {score}',
       'credit.multiplier': 'Credit bonus: ×{value}',
     },
   };
