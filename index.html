@@ -49,9 +49,20 @@
       <div class="menu-panels">
         <section id="menu-panel-shop" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-shop"
           data-menu-panel="shop" hidden>
-          <div class="menu-panel-inner menu-panel-empty">
+          <div class="menu-panel-inner menu-panel-shop">
             <h2 class="menu-panel-title" data-i18n="shop.title">상점</h2>
-            <p class="menu-panel-empty-text" data-i18n="comingSoon">준비중...</p>
+            <div class="shop-draw-grid" aria-label="Draw shop items">
+              <article class="shop-draw-card" aria-label="Skin draw item">
+                <h3 class="shop-draw-title" data-i18n="shop.draw.skin.title">스킨 뽑기</h3>
+                <p class="shop-draw-price" data-i18n="shop.draw.price">75 크레딧</p>
+                <button class="panel-button secondary shop-draw-button" type="button" disabled aria-disabled="true" data-i18n="shop.draw.skin.cta">스킨 뽑기 (준비중)</button>
+              </article>
+              <article class="shop-draw-card" aria-label="Theme draw item">
+                <h3 class="shop-draw-title" data-i18n="shop.draw.theme.title">테마 뽑기</h3>
+                <p class="shop-draw-price" data-i18n="shop.draw.price">75 크레딧</p>
+                <button class="panel-button secondary shop-draw-button" type="button" disabled aria-disabled="true" data-i18n="shop.draw.theme.cta">테마 뽑기 (준비중)</button>
+              </article>
+            </div>
           </div>
         </section>
 
