@@ -83,6 +83,7 @@
     const recentSpawns = [];
     const recentStickSpawns = [];
     const recentMovingStickSpawns = [];
+    const recentWindmillSpawns = [];
 
     const CHUNK_HEIGHT = GRID * 8;
     const GENERATION_PAD = GRID * 16;
@@ -95,6 +96,7 @@
     const RECENT_SPAWN_LIMIT = 24;
     const RECENT_STICK_SPAWN_LIMIT = 32;
     const RECENT_MOVING_STICK_SPAWN_LIMIT = 16;
+    const RECENT_WINDMILL_SPAWN_LIMIT = 20;
     const ROUTE_STEP_MIN = Math.round(STICK_LENGTH * 0.22);
     const ROUTE_STEP_MAX = Math.round(STICK_LENGTH * 0.38);
     const MAIN_ROUTE_BANDS = 5;
@@ -113,6 +115,8 @@
     const WINDMILL_CHANCE_BASE = 0.05;
     const WINDMILL_CHANCE_MAX = 0.22;
     const WINDMILL_DENSITY_SCORE = 30;
+    const WINDMILL_MIN_GAP_BASE = Math.round(GRID * 2.6);
+    const WINDMILL_MIN_GAP_MAX = Math.round(GRID * 4.1);
     const INFINITE_DIFFICULTY_MILESTONES = [100, 250, 500, 1000];
 
     function getInfiniteDifficultyTier(y) {
@@ -256,6 +260,14 @@
       return Math.max(1, 3 - Math.floor(progress * 2));
     }
 
+    function getWindmillMinimumGap(y) {
+      const tier = getInfiniteDifficultyTier(y);
+      const tierBoost = clamp(tier / 4, 0, 1);
+      const score = Math.max(0, Math.floor((GROUND_Y - y) / GRID));
+      const scoreBoost = clamp(Math.max(0, score - 1000) / 1200, 0, 1);
+      return Math.round(WINDMILL_MIN_GAP_BASE + (WINDMILL_MIN_GAP_MAX - WINDMILL_MIN_GAP_BASE) * Math.max(tierBoost, scoreBoost));
+    }
+
     function rememberSpawn(spawn) {
       recentSpawns.push(spawn);
       while (recentSpawns.length > RECENT_SPAWN_LIMIT) {
@@ -274,6 +286,13 @@
       recentMovingStickSpawns.push(spawn);
       while (recentMovingStickSpawns.length > RECENT_MOVING_STICK_SPAWN_LIMIT) {
         recentMovingStickSpawns.shift();
+      }
+    }
+
+    function rememberWindmillSpawn(spawn) {
+      recentWindmillSpawns.push(spawn);
+      while (recentWindmillSpawns.length > RECENT_WINDMILL_SPAWN_LIMIT) {
+        recentWindmillSpawns.shift();
       }
     }
 
@@ -350,6 +369,13 @@
 
     function scoreWindmillCandidate(x, y, radius) {
       if (!isWindmillClearFromMovingStick(y, radius)) return -Infinity;
+      const windmillGap = getWindmillMinimumGap(y);
+      for (const prev of recentWindmillSpawns) {
+        const minDistance = radius + prev.radius + windmillGap;
+        if (Math.hypot(x - prev.x, y - prev.y) < minDistance) {
+          return -Infinity;
+        }
+      }
       const routeCenter = pathX + STICK_LENGTH / 2;
       const distanceFromRoute = Math.abs(x - routeCenter);
       const routePenalty = Math.max(0, 190 - distanceFromRoute) * 0.6;
@@ -685,6 +711,11 @@
         y: centerY,
         radius: getWindmillSpawnRadius(scale),
       });
+      rememberWindmillSpawn({
+        x: spawnX,
+        y: centerY,
+        radius: getWindmillSpawnRadius(scale),
+      });
       return windmill;
     }
 
@@ -930,12 +961,15 @@
 
     function getAccentPlan(y) {
       const tier = getInfiniteDifficultyTier(y);
+      const score = Math.max(0, Math.floor((GROUND_Y - y) / GRID));
+      const overThousand = clamp((score - 1000) / 900, 0, 1);
       return {
         tier,
-        movingStickChance: clamp(MOVING_STICK_CHANCE + tier * 0.08, 0, 0.72),
-        windmillChance: clamp(getWindmillSpawnChance(y) + tier * 0.06, 0, 0.8),
-        sideStickChance: clamp(Math.max(0.02, SIDE_STICK_CHANCE - tier * 0.02), 0.02, 0.16),
+        movingStickChance: clamp(MOVING_STICK_CHANCE + tier * 0.08 + overThousand * 0.2, 0, 0.9),
+        windmillChance: clamp(getWindmillSpawnChance(y) + tier * 0.06 + overThousand * 0.28, 0, 0.95),
+        sideStickChance: clamp(Math.max(0.01, SIDE_STICK_CHANCE - tier * 0.02 - overThousand * 0.06), 0.01, 0.16),
         movingStickCooldownBase: Math.max(1, 2 - Math.floor(tier / 2)),
+        specialBurstChance: clamp(overThousand * 0.55 + Math.max(0, tier - 3) * 0.12, 0, 0.78),
       };
     }
 
@@ -976,6 +1010,22 @@
         if (windmillProgress > 0.55 && rng.next() < clamp((windmillProgress - 0.55) * 0.75 + accentPlan.tier * 0.08, 0, 0.95)) {
           spawnRandomWindmill(windmillY - randRange(70, 120), randRange(0.86, 1.02));
         }
+      }
+
+      if (accentPlan.specialBurstChance > 0 && rng.next() < accentPlan.specialBurstChance) {
+        if (rng.next() < 0.58) {
+          spawnRandomMovingStick(
+            y - randRange(170, 230),
+            Math.round(STICK_LENGTH * randRange(0.56, 0.76)),
+            STICK_HEIGHT
+          );
+          movingStickCooldown = Math.max(movingStickCooldown, Math.max(1, accentPlan.movingStickCooldownBase - 1));
+        } else if (windmillCooldown === 0 || rng.next() < 0.4) {
+          const extraWindmillY = y - randRange(180, 260);
+          spawnRandomWindmill(extraWindmillY, randRange(0.9, 1.12));
+          windmillCooldown = Math.max(1, getWindmillCooldown(y) - 1);
+        }
+        spawnedAccent = true;
       }
 
       if (!spawnedAccent && rng.next() < accentPlan.sideStickChance) {
