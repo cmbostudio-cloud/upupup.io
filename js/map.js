@@ -966,33 +966,32 @@
 
     function getClimbBalancePlan(y) {
       const score = Math.max(0, Math.floor((GROUND_Y - y) / GRID));
-      const overFiveHundred = clamp((score - 500) / 500, 0, 1);
-      const overThousand = clamp((score - 1000) / 1000, 0, 1);
+      const scoreStep = Math.floor(score / 100);
+      const movingStickRatio = clamp((scoreStep - 1) * 0.1, 0, 0.7);
+
       return {
-        mainStickChance: clamp(1 - overFiveHundred * 0.16 - overThousand * 0.18, 0.62, 1),
-        movingStickChanceBonus: overFiveHundred * 0.06 + overThousand * 0.12,
-        forcedMovingStickChance: clamp(overFiveHundred * 0.24 + overThousand * 0.3, 0, 0.54),
+        staticStickRatio: 1 - movingStickRatio,
+        movingStickRatio,
       };
     }
 
     function addSpawnStep(y) {
       const mainStickWidth = STICK_LENGTH;
       const balancePlan = getClimbBalancePlan(y);
-      const spawnMainStick = rng.next() < balancePlan.mainStickChance;
+      const spawnMovingStick = rng.next() < balancePlan.movingStickRatio;
       let mainStickX = Math.round(MAP_W / 2);
 
-      if (spawnMainStick) {
-        mainStickX = spawnRandomStick(y, mainStickWidth, STICK_HEIGHT);
-      } else if (rng.next() < balancePlan.forcedMovingStickChance) {
+      if (spawnMovingStick) {
         spawnRandomMovingStick(
-          y - randRange(130, 180),
+          y,
           Math.round(STICK_LENGTH * randRange(0.62, 0.84)),
           STICK_HEIGHT
         );
-        movingStickCooldown = Math.max(movingStickCooldown, 1);
+      } else {
+        mainStickX = spawnRandomStick(y, mainStickWidth, STICK_HEIGHT);
       }
 
-      if (spawnMainStick && shouldSpawnCredit(y)) {
+      if (!spawnMovingStick && shouldSpawnCredit(y)) {
         spawnRandomCredit(y, mainStickX, mainStickWidth);
       }
 
@@ -1003,7 +1002,7 @@
       let spawnedAccent = false;
       const accentPlan = getAccentPlan(y);
       const movingStickChance = clamp(
-        accentPlan.movingStickChance + balancePlan.movingStickChanceBonus,
+        accentPlan.movingStickChance,
         0,
         0.95
       );
