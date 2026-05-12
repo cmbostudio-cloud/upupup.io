@@ -364,13 +364,16 @@
     const nextSpawnY = Number.isFinite(source.nextSpawnY) ? Math.max(0, Math.floor(source.nextSpawnY)) : null;
     const pathX = Number.isFinite(source.pathX) ? Math.max(0, Math.floor(source.pathX)) : null;
     const seed = Number.isFinite(source.seed) ? source.seed >>> 0 : seedFallback >>> 0;
+    const collectedStarIds = normalizeIdList([
+      ...(Array.isArray(source.collectedStarIds) ? source.collectedStarIds : []),
+      ...(Array.isArray(source.collectedPortalIds) ? source.collectedPortalIds : []),
+    ]);
     return {
       seed,
       nextSpawnY,
       pathX,
       collectedCreditIds: normalizeIdList(source.collectedCreditIds),
-      collectedStarIds: normalizeIdList(source.collectedStarIds),
-      collectedPortalIds: normalizeIdList(source.collectedPortalIds),
+      collectedStarIds,
     };
   }
 
