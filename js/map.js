@@ -966,17 +966,8 @@
 
     function getClimbBalancePlan(y) {
       const score = Math.max(0, Math.floor((GROUND_Y - y) / GRID));
-      let movingStickRatio = 0;
-
-      if (score >= 1500) {
-        movingStickRatio = 0.9;
-      } else if (score >= 750) {
-        movingStickRatio = 0.7;
-      } else if (score >= 300) {
-        movingStickRatio = 0.5;
-      } else if (score >= 100) {
-        movingStickRatio = 0.3;
-      }
+      const scoreStep = Math.floor(score / 100);
+      const movingStickRatio = clamp((scoreStep - 1) * 0.1, 0, 0.7);
 
       return {
         staticStickRatio: 1 - movingStickRatio,
