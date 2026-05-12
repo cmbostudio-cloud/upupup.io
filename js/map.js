@@ -972,11 +972,35 @@
       };
     }
 
+    function getClimbBalancePlan(y) {
+      const score = Math.max(0, Math.floor((GROUND_Y - y) / GRID));
+      const overFiveHundred = clamp((score - 500) / 500, 0, 1);
+      const overThousand = clamp((score - 1000) / 1000, 0, 1);
+      return {
+        mainStickChance: clamp(1 - overFiveHundred * 0.16 - overThousand * 0.18, 0.62, 1),
+        movingStickChanceBonus: overFiveHundred * 0.06 + overThousand * 0.12,
+        forcedMovingStickChance: clamp(overFiveHundred * 0.24 + overThousand * 0.3, 0, 0.54),
+      };
+    }
+
     function addSpawnStep(y) {
       const mainStickWidth = STICK_LENGTH;
-      const mainStickX = spawnRandomStick(y, mainStickWidth, STICK_HEIGHT);
+      const balancePlan = getClimbBalancePlan(y);
+      const spawnMainStick = rng.next() < balancePlan.mainStickChance;
+      let mainStickX = Math.round(MAP_W / 2);
 
-      if (shouldSpawnCredit(y)) {
+      if (spawnMainStick) {
+        mainStickX = spawnRandomStick(y, mainStickWidth, STICK_HEIGHT);
+      } else if (rng.next() < balancePlan.forcedMovingStickChance) {
+        spawnRandomMovingStick(
+          y - randRange(130, 180),
+          Math.round(STICK_LENGTH * randRange(0.62, 0.84)),
+          STICK_HEIGHT
+        );
+        movingStickCooldown = Math.max(movingStickCooldown, 1);
+      }
+
+      if (spawnMainStick && shouldSpawnCredit(y)) {
         spawnRandomCredit(y, mainStickX, mainStickWidth);
       }
 
@@ -986,8 +1010,13 @@
 
       let spawnedAccent = false;
       const accentPlan = getAccentPlan(y);
+      const movingStickChance = clamp(
+        accentPlan.movingStickChance + balancePlan.movingStickChanceBonus,
+        0,
+        0.95
+      );
 
-      if (movingStickCooldown === 0 && rng.next() < accentPlan.movingStickChance) {
+      if (movingStickCooldown === 0 && rng.next() < movingStickChance) {
         spawnRandomMovingStick(
           y - randRange(150, 210),
           Math.round(STICK_LENGTH * randRange(0.58, 0.78)),
