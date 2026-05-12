@@ -172,11 +172,10 @@
       stageLayout,
       collectedCreditIds: initialCollectedCreditIds,
       collectedStarIds: initialSave?.map?.collectedStarIds ?? [],
-      collectedPortalIds: initialSave?.map?.collectedPortalIds ?? [],
       theme: themePalette,
     });
 
-    const stageCollectibles = gameMode === 'stage' ? (map.stars ?? map.portals ?? []) : [];
+    const stageCollectibles = gameMode === 'stage' ? (map.stars ?? []) : [];
     stageStarTotal = gameMode === 'stage' ? stageCollectibles.length : 0;
     stageStarsCollected = gameMode === 'stage'
       ? stageCollectibles.filter((star) => star.collected).length
@@ -295,8 +294,7 @@
         player.ctx.stickSurfaces = activeMap.stickSurfaces;
         player.ctx.windmills = activeMap.windmills;
         player.ctx.credits = activeMap.credits;
-        player.ctx.stars = activeMap.stars ?? activeMap.portals;
-        player.ctx.portals = activeMap.portals ?? activeMap.stars;
+        player.ctx.stars = activeMap.stars ?? [];
       }
     }
 
@@ -563,7 +561,6 @@
         windmills: [],
         credits: [],
         stars: [],
-        portals: [],
         onCreditCollected: null,
         onImpact: null,
         MAP_W,
@@ -766,7 +763,6 @@
 
   window.UpUpUpRuntime = { startGame };
 })();
-
 
 
 

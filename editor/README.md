@@ -32,5 +32,5 @@
 ## 현재 범위
 
 - `stick`은 게임의 `addStick(x, y, width, height)`에 대응합니다.
-- `star`는 게임의 `addPortal(x, y, width, height)`에 대응합니다.
+- `star`는 게임의 `addStar(x, y, width, height)`에 대응합니다.
 - 에디터에는 현재 1스테이지를 기준으로 한 샘플 레이아웃이 들어 있습니다.

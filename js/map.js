@@ -23,7 +23,6 @@
     stageLayout = null,
     collectedCreditIds = [],
     collectedStarIds = [],
-    collectedPortalIds = [],
     theme = {},
   }) {
     const colors = {
@@ -42,7 +41,6 @@
     const toIdKey = (value) => String(value);
     const collectedCreditIdSet = new Set(collectedCreditIds.map(toIdKey));
     const collectedStarIdSet = new Set(collectedStarIds.map(toIdKey));
-    const collectedPortalIdSet = new Set(collectedPortalIds.map(toIdKey));
     const hasCustomStageLayout =
       mode === 'stage' &&
       stageLayout &&
@@ -204,7 +202,7 @@
       credit.endFill();
     }
 
-    function drawPortalShape(portal, width, height) {
+    function drawStarShape(starContainer, width, height) {
       const centerX = width / 2;
       const centerY = height / 2;
       const radius = Math.min(width, height) / 2;
@@ -236,9 +234,9 @@
       star.endFill();
       starLayer.addChild(star);
 
-      portal.addChild(starLayer);
-      portal.ringLayer = starLayer;
-      portal.radius = radius;
+      starContainer.addChild(starLayer);
+      starContainer.ringLayer = starLayer;
+      starContainer.radius = radius;
     }
 
     function getPreferredObstacleSide() {
@@ -889,7 +887,7 @@
     function addStar(x, y, width = PORTAL_SIZE, height = PORTAL_SIZE, sourceId = null) {
       const chunk = ensureChunk(getChunkIndex(y));
       const star = new PIXI.Container();
-      drawPortalShape(star, width, height);
+      drawStarShape(star, width, height);
       const centerX = Math.round(x + width / 2);
       const centerY = Math.round(y + height / 2);
       star.x = Math.round(x);
@@ -914,7 +912,7 @@
       };
 
       stars.push(item);
-      if (collectedStarIdSet.has(toIdKey(item.id)) || collectedPortalIdSet.has(toIdKey(item.id))) {
+      if (collectedStarIdSet.has(toIdKey(item.id))) {
         item.collected = true;
         star.visible = false;
         star.renderable = false;
@@ -923,9 +921,6 @@
         chunk.stars = [];
       }
       chunk.stars.push(item);
-      if (!chunk.portals) {
-        chunk.portals = chunk.stars;
-      }
       rememberSpawn({
         kind: 'star',
         x: item.centerX,
@@ -933,10 +928,6 @@
         radius: item.radius,
       });
       return item;
-    }
-
-    function addPortal(x, y, width = PORTAL_SIZE, height = PORTAL_SIZE, sourceId = null) {
-      return addStar(x, y, width, height, sourceId);
     }
 
     function spawnRandomCredit(y, anchorX, width = STICK_LENGTH) {
@@ -957,7 +948,7 @@
     }
 
     let movingStickCooldown = 0;
-    let windmillCooldown = 0;
+    let nextScheduledWindmillScore = 20;
 
     function getAccentPlan(y) {
       const tier = getInfiniteDifficultyTier(y);
@@ -966,18 +957,41 @@
       return {
         tier,
         movingStickChance: clamp(MOVING_STICK_CHANCE + tier * 0.08 + overThousand * 0.2, 0, 0.9),
-        windmillChance: clamp(getWindmillSpawnChance(y) + tier * 0.06 + overThousand * 0.28, 0, 0.95),
         sideStickChance: clamp(Math.max(0.01, SIDE_STICK_CHANCE - tier * 0.02 - overThousand * 0.06), 0.01, 0.16),
         movingStickCooldownBase: Math.max(1, 2 - Math.floor(tier / 2)),
         specialBurstChance: clamp(overThousand * 0.55 + Math.max(0, tier - 3) * 0.12, 0, 0.78),
       };
     }
 
+    function getClimbBalancePlan(y) {
+      const score = Math.max(0, Math.floor((GROUND_Y - y) / GRID));
+      const overFiveHundred = clamp((score - 500) / 500, 0, 1);
+      const overThousand = clamp((score - 1000) / 1000, 0, 1);
+      return {
+        mainStickChance: clamp(1 - overFiveHundred * 0.16 - overThousand * 0.18, 0.62, 1),
+        movingStickChanceBonus: overFiveHundred * 0.06 + overThousand * 0.12,
+        forcedMovingStickChance: clamp(overFiveHundred * 0.24 + overThousand * 0.3, 0, 0.54),
+      };
+    }
+
     function addSpawnStep(y) {
       const mainStickWidth = STICK_LENGTH;
-      const mainStickX = spawnRandomStick(y, mainStickWidth, STICK_HEIGHT);
+      const balancePlan = getClimbBalancePlan(y);
+      const spawnMainStick = rng.next() < balancePlan.mainStickChance;
+      let mainStickX = Math.round(MAP_W / 2);
 
-      if (shouldSpawnCredit(y)) {
+      if (spawnMainStick) {
+        mainStickX = spawnRandomStick(y, mainStickWidth, STICK_HEIGHT);
+      } else if (rng.next() < balancePlan.forcedMovingStickChance) {
+        spawnRandomMovingStick(
+          y - randRange(130, 180),
+          Math.round(STICK_LENGTH * randRange(0.62, 0.84)),
+          STICK_HEIGHT
+        );
+        movingStickCooldown = Math.max(movingStickCooldown, 1);
+      }
+
+      if (spawnMainStick && shouldSpawnCredit(y)) {
         spawnRandomCredit(y, mainStickX, mainStickWidth);
       }
 
@@ -985,15 +999,15 @@
         movingStickCooldown -= 1;
       }
 
-      if (windmillCooldown > 0) {
-        windmillCooldown -= 1;
-      }
-
       let spawnedAccent = false;
-      const windmillProgress = getWindmillProgress(y);
       const accentPlan = getAccentPlan(y);
+      const movingStickChance = clamp(
+        accentPlan.movingStickChance + balancePlan.movingStickChanceBonus,
+        0,
+        0.95
+      );
 
-      if (movingStickCooldown === 0 && rng.next() < accentPlan.movingStickChance) {
+      if (movingStickCooldown === 0 && rng.next() < movingStickChance) {
         spawnRandomMovingStick(
           y - randRange(150, 210),
           Math.round(STICK_LENGTH * randRange(0.58, 0.78)),
@@ -1001,15 +1015,6 @@
         );
         movingStickCooldown = accentPlan.movingStickCooldownBase;
         spawnedAccent = true;
-      } else if (windmillCooldown === 0 && rng.next() < accentPlan.windmillChance) {
-        const windmillY = y - randRange(110, 170);
-        spawnRandomWindmill(windmillY, randRange(0.92, 1.08));
-        windmillCooldown = getWindmillCooldown(y);
-        spawnedAccent = true;
-
-        if (windmillProgress > 0.55 && rng.next() < clamp((windmillProgress - 0.55) * 0.75 + accentPlan.tier * 0.08, 0, 0.95)) {
-          spawnRandomWindmill(windmillY - randRange(70, 120), randRange(0.86, 1.02));
-        }
       }
 
       if (accentPlan.specialBurstChance > 0 && rng.next() < accentPlan.specialBurstChance) {
@@ -1020,10 +1025,6 @@
             STICK_HEIGHT
           );
           movingStickCooldown = Math.max(movingStickCooldown, Math.max(1, accentPlan.movingStickCooldownBase - 1));
-        } else if (windmillCooldown === 0 || rng.next() < 0.4) {
-          const extraWindmillY = y - randRange(180, 260);
-          spawnRandomWindmill(extraWindmillY, randRange(0.9, 1.12));
-          windmillCooldown = Math.max(1, getWindmillCooldown(y) - 1);
         }
         spawnedAccent = true;
       }
@@ -1034,6 +1035,18 @@
           Math.round(STICK_LENGTH * randRange(0.82, 1)),
           STICK_HEIGHT
         );
+      }
+    }
+
+
+    function spawnScheduledWindmillsBetween(upperY, lowerY) {
+      if (mode !== 'infinite') return;
+
+      while (true) {
+        const scheduledY = GROUND_Y - nextScheduledWindmillScore * GRID;
+        if (scheduledY > upperY || scheduledY <= lowerY) break;
+        spawnRandomWindmill(scheduledY, randRange(0.92, 1.08));
+        nextScheduledWindmillScore += 20;
       }
     }
 
@@ -1096,16 +1109,20 @@
 
       let y = GROUND_Y - randRange(220, 280);
       for (let i = 0; i < 4; i++) {
-        addSpawnStep(Math.round(y));
+        const currentY = Math.round(y);
+        addSpawnStep(currentY);
         y -= randRange(220, 320);
+        spawnScheduledWindmillsBetween(currentY, y);
       }
     }
 
     function ensureGeneratedAbove(targetY) {
       if (isStageOne || hasCustomStageLayout) return;
       while (nextSpawnY > targetY) {
-        addSpawnStep(nextSpawnY);
+        const currentY = nextSpawnY;
+        addSpawnStep(currentY);
         nextSpawnY -= randRange(220, 320);
+        spawnScheduledWindmillsBetween(currentY, nextSpawnY);
       }
     }
 
@@ -1171,7 +1188,6 @@
       windmills: [],
       credits: [],
       stars: [],
-      portals: [],
     };
 
     function updateChunkVisibility(minIndex, maxIndex) {
@@ -1232,7 +1248,6 @@
         windmills: activeWindmills,
         credits: activeCredits,
         stars: activeStars,
-        portals: activeStars,
       };
       return lastActiveObjects;
     }
@@ -1256,7 +1271,6 @@
         pathX: hasCustomStageLayout ? null : pathX,
         collectedCreditIds: credits.filter((credit) => credit.collected).map((credit) => credit.id),
         collectedStarIds: stars.filter((star) => star.collected).map((star) => star.id),
-        collectedPortalIds: stars.filter((star) => star.collected).map((star) => star.id),
       };
     }
 
@@ -1278,7 +1292,6 @@
       windmills,
       credits,
       stars,
-      portals: stars,
       addStar,
       syncToCamera,
       generateTo,
