@@ -27,6 +27,7 @@
 
   function startGame({ canvas, shell, initialSave, audio, mode = 'infinite', stage = 1 }) {
     const SKIN_COLORS = {
+      default: 0xffffff,
       red: 0xef4444,
       orange: 0xf97316,
       yellow: 0xeab308,
@@ -779,5 +780,4 @@
 
   window.UpUpUpRuntime = { startGame };
 })();
-
 

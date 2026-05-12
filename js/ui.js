@@ -84,8 +84,8 @@
     let menuVisible = true;
     let ownedThemes = Array.isArray(prefs.ownedThemes) ? prefs.ownedThemes : ['default'];
     let currentTheme = typeof prefs.currentTheme === 'string' ? prefs.currentTheme : 'default';
-    let ownedSkins = Array.isArray(prefs.ownedSkins) ? prefs.ownedSkins : ['red'];
-    let currentSkin = typeof prefs.currentSkin === 'string' ? prefs.currentSkin : 'red';
+    let ownedSkins = Array.isArray(prefs.ownedSkins) ? prefs.ownedSkins : ['default'];
+    let currentSkin = typeof prefs.currentSkin === 'string' ? prefs.currentSkin : 'default';
     let creditBalance = 0;
     let activeTab = 'game';
     let activeSkinTab = 'skins';
@@ -94,6 +94,7 @@
     const stageCount = 50;
     const skinDrawPrice = 75;
     const skinItems = [
+      { id: 'default', labelKey: 'skin.default', color: '#ffffff' },
       { id: 'red', labelKey: 'skin.red', color: '#ef4444' },
       { id: 'orange', labelKey: 'skin.orange', color: '#f97316' },
       { id: 'yellow', labelKey: 'skin.yellow', color: '#eab308' },
@@ -247,7 +248,7 @@
     }
 
     function unlockRandomSkin() {
-      const locked = skinItems.filter((item) => !ownedSkins.includes(item.id));
+      const locked = skinItems.filter((item) => item.id !== 'default' && !ownedSkins.includes(item.id));
       if (locked.length === 0) {
         setStatus(t('skin.allUnlocked'));
         return;
@@ -994,8 +995,9 @@
       language = i18n?.readLanguage?.() ?? language;
       ownedThemes = Array.isArray(nextPrefs.ownedThemes) ? nextPrefs.ownedThemes : ['default'];
       currentTheme = typeof nextPrefs.currentTheme === 'string' ? nextPrefs.currentTheme : 'default';
-      ownedSkins = Array.isArray(nextPrefs.ownedSkins) ? nextPrefs.ownedSkins : ['red'];
-      currentSkin = typeof nextPrefs.currentSkin === 'string' ? nextPrefs.currentSkin : 'red';
+      ownedSkins = Array.isArray(nextPrefs.ownedSkins) ? nextPrefs.ownedSkins : ['default'];
+      if (!ownedSkins.includes('default')) ownedSkins.unshift('default');
+      currentSkin = typeof nextPrefs.currentSkin === 'string' ? nextPrefs.currentSkin : 'default';
       applyTheme(currentTheme);
       renderStaticCopy();
       syncGuestCloudControls();

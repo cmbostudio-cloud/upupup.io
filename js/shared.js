@@ -226,9 +226,9 @@
         : 0.8,
       language: ['ko', 'en'].includes(prefs?.language) ? prefs.language : 'ko',
       ownedSkins: Array.isArray(prefs?.ownedSkins)
-        ? Array.from(new Set(prefs.ownedSkins.map((skinId) => String(skinId || '').toLowerCase()).filter(Boolean)))
-        : ['red'],
-      currentSkin: typeof prefs?.currentSkin === 'string' ? prefs.currentSkin : 'red',
+        ? Array.from(new Set(['default', ...prefs.ownedSkins.map((skinId) => String(skinId || '').toLowerCase()).filter(Boolean)]))
+        : ['default'],
+      currentSkin: typeof prefs?.currentSkin === 'string' ? prefs.currentSkin : 'default',
       ...themeShop,
     };
   }

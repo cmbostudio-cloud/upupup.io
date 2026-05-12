@@ -31,6 +31,7 @@
       'skin.themes': '테마',
       'theme.choose': '테마를 선택하세요.',
 
+      'skin.default': '기본(흰색)',
       'skin.red': '빨강',
       'skin.orange': '주황',
       'skin.yellow': '노랑',
@@ -205,6 +206,7 @@
       'skin.themes': 'Themes',
       'theme.choose': 'Choose a theme.',
 
+      'skin.default': 'Default (White)',
       'skin.red': 'Red',
       'skin.orange': 'Orange',
       'skin.yellow': 'Yellow',
