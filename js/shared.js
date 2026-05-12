@@ -225,6 +225,10 @@
         ? Math.max(0, Math.min(1, prefs.audioVolume))
         : 0.8,
       language: ['ko', 'en'].includes(prefs?.language) ? prefs.language : 'ko',
+      ownedSkins: Array.isArray(prefs?.ownedSkins)
+        ? Array.from(new Set(prefs.ownedSkins.map((skinId) => String(skinId || '').toLowerCase()).filter(Boolean)))
+        : ['red'],
+      currentSkin: typeof prefs?.currentSkin === 'string' ? prefs.currentSkin : 'red',
       ...themeShop,
     };
   }
@@ -240,6 +244,10 @@
           ? Math.max(0, Math.min(1, prefs.audioVolume))
           : current.audioVolume,
         language: ['ko', 'en'].includes(prefs.language) ? prefs.language : current.language,
+        ownedSkins: Array.isArray(prefs.ownedSkins)
+          ? Array.from(new Set(prefs.ownedSkins.map((skinId) => String(skinId || '').toLowerCase()).filter(Boolean)))
+          : current.ownedSkins,
+        currentSkin: typeof prefs.currentSkin === 'string' ? prefs.currentSkin : current.currentSkin,
       });
     } catch {
       return false;
