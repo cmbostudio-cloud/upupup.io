@@ -931,8 +931,9 @@
     }
 
     function spawnRandomCredit(y, anchorX, width = STICK_LENGTH) {
+      const centerX = anchorX + width / 2;
       const x = clamp(
-        anchorX + randRange(-width * 0.12, width * 0.12),
+        centerX + randRange(-width * 0.04, width * 0.04),
         STICK_MARGIN_X,
         MAP_W - STICK_MARGIN_X
       );
