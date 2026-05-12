@@ -23,7 +23,6 @@
     stageLayout = null,
     collectedCreditIds = [],
     collectedStarIds = [],
-    collectedPortalIds = [],
     theme = {},
   }) {
     const colors = {
@@ -42,7 +41,6 @@
     const toIdKey = (value) => String(value);
     const collectedCreditIdSet = new Set(collectedCreditIds.map(toIdKey));
     const collectedStarIdSet = new Set(collectedStarIds.map(toIdKey));
-    const collectedPortalIdSet = new Set(collectedPortalIds.map(toIdKey));
     const hasCustomStageLayout =
       mode === 'stage' &&
       stageLayout &&
@@ -204,7 +202,7 @@
       credit.endFill();
     }
 
-    function drawPortalShape(portal, width, height) {
+    function drawStarShape(starContainer, width, height) {
       const centerX = width / 2;
       const centerY = height / 2;
       const radius = Math.min(width, height) / 2;
@@ -236,9 +234,9 @@
       star.endFill();
       starLayer.addChild(star);
 
-      portal.addChild(starLayer);
-      portal.ringLayer = starLayer;
-      portal.radius = radius;
+      starContainer.addChild(starLayer);
+      starContainer.ringLayer = starLayer;
+      starContainer.radius = radius;
     }
 
     function getPreferredObstacleSide() {
@@ -889,7 +887,7 @@
     function addStar(x, y, width = PORTAL_SIZE, height = PORTAL_SIZE, sourceId = null) {
       const chunk = ensureChunk(getChunkIndex(y));
       const star = new PIXI.Container();
-      drawPortalShape(star, width, height);
+      drawStarShape(star, width, height);
       const centerX = Math.round(x + width / 2);
       const centerY = Math.round(y + height / 2);
       star.x = Math.round(x);
@@ -914,7 +912,7 @@
       };
 
       stars.push(item);
-      if (collectedStarIdSet.has(toIdKey(item.id)) || collectedPortalIdSet.has(toIdKey(item.id))) {
+      if (collectedStarIdSet.has(toIdKey(item.id))) {
         item.collected = true;
         star.visible = false;
         star.renderable = false;
@@ -923,9 +921,6 @@
         chunk.stars = [];
       }
       chunk.stars.push(item);
-      if (!chunk.portals) {
-        chunk.portals = chunk.stars;
-      }
       rememberSpawn({
         kind: 'star',
         x: item.centerX,
@@ -933,10 +928,6 @@
         radius: item.radius,
       });
       return item;
-    }
-
-    function addPortal(x, y, width = PORTAL_SIZE, height = PORTAL_SIZE, sourceId = null) {
-      return addStar(x, y, width, height, sourceId);
     }
 
     function spawnRandomCredit(y, anchorX, width = STICK_LENGTH) {
@@ -1197,7 +1188,6 @@
       windmills: [],
       credits: [],
       stars: [],
-      portals: [],
     };
 
     function updateChunkVisibility(minIndex, maxIndex) {
@@ -1258,7 +1248,6 @@
         windmills: activeWindmills,
         credits: activeCredits,
         stars: activeStars,
-        portals: activeStars,
       };
       return lastActiveObjects;
     }
@@ -1282,7 +1271,6 @@
         pathX: hasCustomStageLayout ? null : pathX,
         collectedCreditIds: credits.filter((credit) => credit.collected).map((credit) => credit.id),
         collectedStarIds: stars.filter((star) => star.collected).map((star) => star.id),
-        collectedPortalIds: stars.filter((star) => star.collected).map((star) => star.id),
       };
     }
 
@@ -1304,7 +1292,6 @@
       windmills,
       credits,
       stars,
-      portals: stars,
       addStar,
       syncToCamera,
       generateTo,
