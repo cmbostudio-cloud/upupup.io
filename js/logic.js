@@ -325,7 +325,7 @@
       this.gfx.beginFill(this.ctx.theme?.inkSoft ?? 0x1a1a1a);
       this.gfx.drawRoundedRect(0, 0, this.size, this.size, this.ctx.PLAYER_RADIUS);
       this.gfx.endFill();
-      this.gfx.beginFill(this.ctx.theme?.playerFill ?? this.color);
+      this.gfx.beginFill(this.ctx.playerFillOverride ?? this.color ?? this.ctx.theme?.playerFill ?? 0xffffff);
       this.gfx.drawRoundedRect(
         this.ctx.PLAYER_BORDER,
         this.ctx.PLAYER_BORDER,

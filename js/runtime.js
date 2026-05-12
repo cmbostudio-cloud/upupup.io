@@ -26,6 +26,16 @@
   } = window.UpUpUpShared;
 
   function startGame({ canvas, shell, initialSave, audio, mode = 'infinite', stage = 1 }) {
+    const SKIN_COLORS = {
+      default: 0xffffff,
+      red: 0xef4444,
+      orange: 0xf97316,
+      yellow: 0xeab308,
+      green: 0x22c55e,
+      blue: 0x3b82f6,
+      indigo: 0x6366f1,
+      violet: 0xa855f7,
+    };
     let { width: CANVAS_W, height: CANVAS_H } = getViewportSize();
     const IS_TOUCH_DEVICE =
       window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -124,6 +134,7 @@
     const DEFAULT_PLAYER_X = Math.round(MAP_W / 2 - PLAYER_SIZE / 2);
 
     const prefs = shell.getPreferences();
+    const resolveSkinColor = (skinId) => SKIN_COLORS[String(skinId || '').toLowerCase()] ?? 0xffffff;
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
     let isLoadingFromSave = false;
@@ -569,6 +580,7 @@
         PLAYER_RADIUS,
         PLAYER_BORDER,
         theme: themePalette,
+        playerFillOverride: resolveSkinColor(prefs.currentSkin),
       },
       initialSaveForGame?.player?.x ?? DEFAULT_PLAYER_X,
       initialSaveForGame?.player?.y ?? GROUND_Y - 44
@@ -693,6 +705,11 @@
     });
 
     app.stage.eventMode = 'static';
+    window.addEventListener('upupup:skin-changed', (event) => {
+      if (!player) return;
+      player.ctx.playerFillOverride = resolveSkinColor(event?.detail?.skinId);
+      player.drawSquare();
+    });
     app.ticker.maxFPS = 60;
     app.ticker.add(() => {
       if (stageCleared) return;
@@ -763,7 +780,4 @@
 
   window.UpUpUpRuntime = { startGame };
 })();
-
-
-
 

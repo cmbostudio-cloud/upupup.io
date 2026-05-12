@@ -38,6 +38,9 @@
     const saveStatus = document.getElementById('save-status');
     const shopThemeGrid = document.getElementById('shop-theme-grid');
     const shopThemeStatus = document.getElementById('shop-theme-status');
+    const shopDrawSkinBtn = document.getElementById('shop-draw-skin-btn');
+    const skinCollectionStatus = document.getElementById('skin-collection-status');
+    const skinCollectionGrid = document.getElementById('skin-collection-grid');
     const skinSubtabButtons = Array.from(document.querySelectorAll('[data-skin-tab]'));
     const skinSubpanels = Array.from(document.querySelectorAll('[data-skin-panel]'));
     const gameTitle = gamePanel?.querySelector('.menu-title');
@@ -81,12 +84,25 @@
     let menuVisible = true;
     let ownedThemes = Array.isArray(prefs.ownedThemes) ? prefs.ownedThemes : ['default'];
     let currentTheme = typeof prefs.currentTheme === 'string' ? prefs.currentTheme : 'default';
+    let ownedSkins = Array.isArray(prefs.ownedSkins) ? prefs.ownedSkins : ['default'];
+    let currentSkin = typeof prefs.currentSkin === 'string' ? prefs.currentSkin : 'default';
     let creditBalance = 0;
     let activeTab = 'game';
     let activeSkinTab = 'skins';
     let gameView = 'modes';
 
     const stageCount = 50;
+    const skinDrawPrice = 75;
+    const skinItems = [
+      { id: 'default', labelKey: 'skin.default', color: '#ffffff' },
+      { id: 'red', labelKey: 'skin.red', color: '#ef4444' },
+      { id: 'orange', labelKey: 'skin.orange', color: '#f97316' },
+      { id: 'yellow', labelKey: 'skin.yellow', color: '#eab308' },
+      { id: 'green', labelKey: 'skin.green', color: '#22c55e' },
+      { id: 'blue', labelKey: 'skin.blue', color: '#3b82f6' },
+      { id: 'indigo', labelKey: 'skin.indigo', color: '#6366f1' },
+      { id: 'violet', labelKey: 'skin.violet', color: '#a855f7' },
+    ];
 
     const stageSelectPanel = document.createElement('div');
     stageSelectPanel.id = 'stage-select-panel';
@@ -200,6 +216,55 @@
       setGridVisible(gridVisible, { persist: false });
       updateMenuState(storageReadSave());
       if (shopThemeStatus) shopThemeStatus.textContent = t('theme.choose');
+      if (shopDrawSkinBtn) {
+        shopDrawSkinBtn.textContent = t('shop.draw.skin.cta');
+      }
+      renderSkinCollection();
+    }
+
+    function persistSkinPrefs() {
+      return writePrefs({ ownedSkins, currentSkin });
+    }
+
+    function renderSkinCollection() {
+      if (!skinCollectionGrid) return;
+      skinCollectionGrid.innerHTML = skinItems.map((item) => {
+        const unlocked = ownedSkins.includes(item.id);
+        const active = unlocked && currentSkin === item.id;
+        const preview = unlocked
+          ? `<span class="skin-preview" style="--skin-color:${item.color};"></span>`
+          : `<span class="skin-preview skin-preview-locked">?</span>`;
+        return `
+          <button class="skin-card" type="button" data-skin-id="${item.id}" ${unlocked ? '' : 'disabled'}>
+            ${preview}
+            <span class="skin-card-title">${t(item.labelKey)}${active ? t('skin.activeSuffix') : ''}</span>
+            <span class="skin-card-meta">${unlocked ? t('skin.unlocked') : t('skin.locked')}</span>
+          </button>
+        `;
+      }).join('');
+      if (skinCollectionStatus) {
+        skinCollectionStatus.textContent = t('skin.lockedHint');
+      }
+    }
+
+    function unlockRandomSkin() {
+      const locked = skinItems.filter((item) => item.id !== 'default' && !ownedSkins.includes(item.id));
+      if (locked.length === 0) {
+        setStatus(t('skin.allUnlocked'));
+        return;
+      }
+      if (creditBalance < skinDrawPrice) {
+        setStatus(t('skin.notEnoughCredits', { price: skinDrawPrice }));
+        return;
+      }
+      const picked = locked[Math.floor(Math.random() * locked.length)];
+      ownedSkins = Array.from(new Set([...ownedSkins, picked.id]));
+      currentSkin = picked.id;
+      setCreditBalance(creditBalance - skinDrawPrice);
+      persistSkinPrefs();
+      setStatus(t('skin.unlockedMessage', { skin: t(picked.labelKey) }));
+      window.dispatchEvent(new CustomEvent('upupup:skin-changed', { detail: { skinId: currentSkin } }));
+      renderSkinCollection();
     }
 
     if (menuContinueNote) {
@@ -700,6 +765,23 @@
         buyOrApplyTheme(themeButton.dataset.themeId);
       });
 
+      shopDrawSkinBtn?.addEventListener('click', () => {
+        unlockRandomSkin();
+      });
+
+      skinCollectionGrid?.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const skinButton = target?.closest('[data-skin-id]');
+        if (!skinButton || !skinCollectionGrid.contains(skinButton) || skinButton.hasAttribute('disabled')) return;
+        const skinId = skinButton.dataset.skinId;
+        if (!ownedSkins.includes(skinId)) return;
+        currentSkin = skinId;
+        persistSkinPrefs();
+        renderSkinCollection();
+        setStatus(t('skin.applied', { skin: t(skinItems.find((item) => item.id === skinId)?.labelKey || 'skin.red') }));
+        window.dispatchEvent(new CustomEvent('upupup:skin-changed', { detail: { skinId: currentSkin } }));
+      });
+
       editorAccessBtn?.addEventListener('click', async () => {
         const auth = window.UpUpUpAuth;
         if (!auth?.requireEditorAccess) {
@@ -913,6 +995,9 @@
       language = i18n?.readLanguage?.() ?? language;
       ownedThemes = Array.isArray(nextPrefs.ownedThemes) ? nextPrefs.ownedThemes : ['default'];
       currentTheme = typeof nextPrefs.currentTheme === 'string' ? nextPrefs.currentTheme : 'default';
+      ownedSkins = Array.isArray(nextPrefs.ownedSkins) ? nextPrefs.ownedSkins : ['default'];
+      if (!ownedSkins.includes('default')) ownedSkins.unshift('default');
+      currentSkin = typeof nextPrefs.currentSkin === 'string' ? nextPrefs.currentSkin : 'default';
       applyTheme(currentTheme);
       renderStaticCopy();
       syncGuestCloudControls();
@@ -926,11 +1011,21 @@
     setAutosaveEnabled(autoSaveEnabled);
     syncAudioVolumeUI();
     renderThemeShop();
+    renderSkinCollection();
     syncGuestCloudControls();
 
     return {
       getPreferences() {
-        return { autoSaveEnabled, gridVisible, audioVolume, language, currentTheme, ownedThemes: [...ownedThemes] };
+        return {
+          autoSaveEnabled,
+          gridVisible,
+          audioVolume,
+          language,
+          currentTheme,
+          ownedThemes: [...ownedThemes],
+          currentSkin,
+          ownedSkins: [...ownedSkins],
+        };
       },
       setActions,
       setStatus,

@@ -430,12 +430,57 @@ textarea {
 }
 
 @media (max-width: 1260px) {
+  body {
+    overflow-y: auto;
+  }
+
+  .editor-app {
+    min-height: 100dvh;
+    height: auto;
+  }
+
   .editor-layout {
     grid-template-columns: minmax(0, 1fr);
+    padding-bottom: 8px;
   }
 
   .panel-preview {
     order: -1;
+  }
+}
+
+@media (max-height: 860px) and (orientation: landscape) {
+  .editor-topbar {
+    align-items: center;
+    padding: 10px 0 8px;
+    gap: 12px;
+  }
+
+  .editor-brand h1 {
+    font-size: clamp(20px, 2.2vw, 28px);
+    margin: 2px 0 4px;
+  }
+
+  .editor-brand p {
+    font-size: 13px;
+  }
+
+  .panel {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .panel-right textarea {
+    min-height: 220px;
+  }
+
+  .canvas-shell {
+    padding: 10px;
+  }
+
+  .editor-statusbar {
+    min-height: 34px;
+    padding-bottom: 8px;
   }
 }
 

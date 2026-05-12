@@ -55,7 +55,7 @@
               <article class="shop-draw-card" aria-label="Skin draw item">
                 <h3 class="shop-draw-title" data-i18n="shop.draw.skin.title">스킨 뽑기</h3>
                 <p class="shop-draw-price" data-i18n="shop.draw.price">75 크레딧</p>
-                <button class="panel-button secondary shop-draw-button" type="button" disabled aria-disabled="true" data-i18n="shop.draw.skin.cta">스킨 뽑기 (준비중)</button>
+                <button id="shop-draw-skin-btn" class="panel-button secondary shop-draw-button" type="button" data-i18n="shop.draw.skin.cta">스킨 뽑기 (준비중)</button>
               </article>
               <article class="shop-draw-card" aria-label="Theme draw item">
                 <h3 class="shop-draw-title" data-i18n="shop.draw.theme.title">테마 뽑기</h3>
@@ -78,7 +78,8 @@
             </div>
             <div id="skin-panel-skins" class="skin-subpanel" role="tabpanel" aria-labelledby="skin-subtab-skins"
               data-skin-panel="skins">
-              <p class="menu-panel-empty-text" data-i18n="comingSoon">준비중...</p>
+              <p id="skin-collection-status" class="menu-panel-empty-text" data-i18n="skin.lockedHint">잠금된 스킨은 미리보기가 감춰집니다.</p>
+              <div id="skin-collection-grid" class="skin-collection-grid" aria-label="Skin collection"></div>
             </div>
             <div id="skin-panel-themes" class="skin-subpanel" role="tabpanel" aria-labelledby="skin-subtab-themes"
               data-skin-panel="themes" hidden>
