@@ -76,6 +76,22 @@
       </div>
     `;
 
+
+
+    const skinUnlockPopup = document.createElement('div');
+    skinUnlockPopup.className = 'skin-unlock-popup';
+    skinUnlockPopup.hidden = true;
+    skinUnlockPopup.innerHTML = `
+      <div class="skin-unlock-panel" role="dialog" aria-modal="true" aria-labelledby="skin-unlock-title" aria-describedby="skin-unlock-desc">
+        <span class="skin-unlock-kicker">${t('skin.unlock.kicker')}</span>
+        <h2 id="skin-unlock-title" class="skin-unlock-title">${t('skin.unlock.title')}</h2>
+        <p id="skin-unlock-desc" class="skin-unlock-desc">${t('skin.unlock.desc')}</p>
+        <span id="skin-unlock-preview" class="skin-preview skin-unlock-preview" style="--skin-color:#fff;"></span>
+        <p id="skin-unlock-name" class="skin-unlock-name"></p>
+        <button id="skin-unlock-confirm-btn" class="panel-button secondary skin-unlock-confirm-btn" type="button">${t('confirm')}</button>
+      </div>
+    `;
+
     const prefs = readPrefs();
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
@@ -92,7 +108,7 @@
     let gameView = 'modes';
 
     const stageCount = 50;
-    const skinDrawPrice = 75;
+    const skinDrawPrice = 100;
     const skinItems = [
       { id: 'default', labelKey: 'skin.default', color: '#ffffff' },
       { id: 'red', labelKey: 'skin.red', color: '#ef4444' },
@@ -102,6 +118,8 @@
       { id: 'blue', labelKey: 'skin.blue', color: '#3b82f6' },
       { id: 'indigo', labelKey: 'skin.indigo', color: '#6366f1' },
       { id: 'violet', labelKey: 'skin.violet', color: '#a855f7' },
+      { id: 'frost', labelKey: 'skin.frost', color: '#cdefff', previewClass: 'skin-preview-frost' },
+      { id: 'solar', labelKey: 'skin.solar', color: '#ffe780', previewClass: 'skin-preview-solar' },
     ];
 
     const stageSelectPanel = document.createElement('div');
@@ -210,6 +228,10 @@
       abandonWarningPopup.querySelector('#abandon-warning-desc').textContent = t('abandon.desc');
       if (abandonCancelBtn) abandonCancelBtn.textContent = t('cancel');
       if (abandonConfirmBtn) abandonConfirmBtn.textContent = t('abandon.confirm');
+      skinUnlockPopup.querySelector('.skin-unlock-kicker').textContent = t('skin.unlock.kicker');
+      skinUnlockPopup.querySelector('#skin-unlock-title').textContent = t('skin.unlock.title');
+      skinUnlockPopup.querySelector('#skin-unlock-desc').textContent = t('skin.unlock.desc');
+      if (skinUnlockConfirmBtn) skinUnlockConfirmBtn.textContent = t('confirm');
       setModeCardCopy();
       renderStageCards();
       renderThemeShop();
@@ -232,7 +254,7 @@
         const unlocked = ownedSkins.includes(item.id);
         const active = unlocked && currentSkin === item.id;
         const preview = unlocked
-          ? `<span class="skin-preview" style="--skin-color:${item.color};"></span>`
+          ? `<span class="skin-preview ${item.previewClass || ''}" style="--skin-color:${item.color};"></span>`
           : `<span class="skin-preview skin-preview-locked">?</span>`;
         return `
           <button class="skin-card" type="button" data-skin-id="${item.id}" ${unlocked ? '' : 'disabled'}>
@@ -263,6 +285,7 @@
       setCreditBalance(creditBalance - skinDrawPrice);
       persistSkinPrefs();
       setStatus(t('skin.unlockedMessage', { skin: t(picked.labelKey) }));
+      showSkinUnlockPopup(picked);
       window.dispatchEvent(new CustomEvent('upupup:skin-changed', { detail: { skinId: currentSkin } }));
       renderSkinCollection();
     }
@@ -274,7 +297,7 @@
       gamePanel.append(stageSelectPanel, infiniteSelectPanel);
     }
 
-    document.body.append(stageClearPopup, abandonWarningPopup);
+    document.body.append(stageClearPopup, abandonWarningPopup, skinUnlockPopup);
 
     const stageBackBtn = stageSelectPanel.querySelector('#stage-back-btn');
     const stageGrid = stageSelectPanel.querySelector('#stage-grid');
@@ -289,6 +312,9 @@
     const stageClearConfirmBtn = stageClearPopup.querySelector('#stage-clear-confirm-btn');
     const abandonCancelBtn = abandonWarningPopup.querySelector('#abandon-cancel-btn');
     const abandonConfirmBtn = abandonWarningPopup.querySelector('#abandon-confirm-btn');
+    const skinUnlockPreview = skinUnlockPopup.querySelector('#skin-unlock-preview');
+    const skinUnlockName = skinUnlockPopup.querySelector('#skin-unlock-name');
+    const skinUnlockConfirmBtn = skinUnlockPopup.querySelector('#skin-unlock-confirm-btn');
 
     let stageClearConfirmAction = null;
     let abandonConfirmAction = null;
@@ -434,6 +460,21 @@
     function showAbandonWarningPopup({ onConfirm = null } = {}) {
       abandonConfirmAction = typeof onConfirm === 'function' ? onConfirm : null;
       abandonWarningPopup.hidden = false;
+    }
+
+
+    function hideSkinUnlockPopup() {
+      skinUnlockPopup.hidden = true;
+    }
+
+    function showSkinUnlockPopup(skinItem) {
+      if (!skinItem) return;
+      if (skinUnlockPreview) {
+        skinUnlockPreview.className = `skin-preview skin-unlock-preview ${skinItem.previewClass || ''}`;
+        skinUnlockPreview.style.setProperty('--skin-color', skinItem.color || '#fff');
+      }
+      if (skinUnlockName) skinUnlockName.textContent = t('skin.unlock.congrats', { skin: t(skinItem.labelKey) });
+      skinUnlockPopup.hidden = false;
     }
 
     function showStageClearPopup({ stage = 1, reward = 0, onConfirm = null } = {}) {
@@ -972,6 +1013,10 @@
 
       abandonCancelBtn?.addEventListener('click', () => {
         hideAbandonWarningPopup();
+      });
+
+      skinUnlockConfirmBtn?.addEventListener('click', () => {
+        hideSkinUnlockPopup();
       });
 
       abandonConfirmBtn?.addEventListener('click', () => {
