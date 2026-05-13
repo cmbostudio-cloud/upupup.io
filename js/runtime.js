@@ -38,6 +38,10 @@
       frost: 0xcdefff,
       solar: 0xffe780,
     };
+    const SKIN_IMAGES = {
+      frost: 'assets/skins/frost.png',
+      solar: 'assets/skins/solar.png',
+    };
     let { width: CANVAS_W, height: CANVAS_H } = getViewportSize();
     const IS_TOUCH_DEVICE =
       window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -137,6 +141,7 @@
 
     const prefs = shell.getPreferences();
     const resolveSkinColor = (skinId) => SKIN_COLORS[String(skinId || '').toLowerCase()] ?? 0xffffff;
+    const resolveSkinImage = (skinId) => SKIN_IMAGES[String(skinId || '').toLowerCase()] ?? null;
     let autoSaveEnabled = prefs.autoSaveEnabled;
     let gridVisible = prefs.gridVisible;
     let isLoadingFromSave = false;
@@ -583,6 +588,7 @@
         PLAYER_BORDER,
         theme: themePalette,
         playerFillOverride: resolveSkinColor(prefs.currentSkin),
+        playerSkinImage: resolveSkinImage(prefs.currentSkin),
       },
       initialSaveForGame?.player?.x ?? DEFAULT_PLAYER_X,
       initialSaveForGame?.player?.y ?? GROUND_Y - 44
@@ -710,6 +716,7 @@
     window.addEventListener('upupup:skin-changed', (event) => {
       if (!player) return;
       player.ctx.playerFillOverride = resolveSkinColor(event?.detail?.skinId);
+      player.ctx.playerSkinImage = resolveSkinImage(event?.detail?.skinId);
       player.drawSquare();
     });
     app.ticker.maxFPS = 60;
@@ -782,4 +789,3 @@
 
   window.UpUpUpRuntime = { startGame };
 })();
-
