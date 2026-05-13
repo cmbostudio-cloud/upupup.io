@@ -118,6 +118,8 @@
       { id: 'blue', labelKey: 'skin.blue', color: '#3b82f6' },
       { id: 'indigo', labelKey: 'skin.indigo', color: '#6366f1' },
       { id: 'violet', labelKey: 'skin.violet', color: '#a855f7' },
+      { id: 'frost', labelKey: 'skin.frost', color: '#cdefff', previewClass: 'skin-preview-frost' },
+      { id: 'solar', labelKey: 'skin.solar', color: '#ffe780', previewClass: 'skin-preview-solar' },
     ];
 
     const stageSelectPanel = document.createElement('div');
@@ -252,7 +254,7 @@
         const unlocked = ownedSkins.includes(item.id);
         const active = unlocked && currentSkin === item.id;
         const preview = unlocked
-          ? `<span class="skin-preview" style="--skin-color:${item.color};"></span>`
+          ? `<span class="skin-preview ${item.previewClass || ''}" style="--skin-color:${item.color};"></span>`
           : `<span class="skin-preview skin-preview-locked">?</span>`;
         return `
           <button class="skin-card" type="button" data-skin-id="${item.id}" ${unlocked ? '' : 'disabled'}>
@@ -467,7 +469,10 @@
 
     function showSkinUnlockPopup(skinItem) {
       if (!skinItem) return;
-      if (skinUnlockPreview) skinUnlockPreview.style.setProperty('--skin-color', skinItem.color || '#fff');
+      if (skinUnlockPreview) {
+        skinUnlockPreview.className = `skin-preview skin-unlock-preview ${skinItem.previewClass || ''}`;
+        skinUnlockPreview.style.setProperty('--skin-color', skinItem.color || '#fff');
+      }
       if (skinUnlockName) skinUnlockName.textContent = t('skin.unlock.congrats', { skin: t(skinItem.labelKey) });
       skinUnlockPopup.hidden = false;
     }

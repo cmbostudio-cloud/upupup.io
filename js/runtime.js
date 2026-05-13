@@ -35,6 +35,8 @@
       blue: 0x3b82f6,
       indigo: 0x6366f1,
       violet: 0xa855f7,
+      frost: 0xcdefff,
+      solar: 0xffe780,
     };
     let { width: CANVAS_W, height: CANVAS_H } = getViewportSize();
     const IS_TOUCH_DEVICE =
