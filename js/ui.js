@@ -118,8 +118,8 @@
       { id: 'blue', labelKey: 'skin.blue', color: '#3b82f6' },
       { id: 'indigo', labelKey: 'skin.indigo', color: '#6366f1' },
       { id: 'violet', labelKey: 'skin.violet', color: '#a855f7' },
-      { id: 'frost', labelKey: 'skin.frost', color: '#cdefff', previewClass: 'skin-preview-frost' },
-      { id: 'solar', labelKey: 'skin.solar', color: '#ffe780', previewClass: 'skin-preview-solar' },
+      { id: 'frost', labelKey: 'skin.frost', color: '#cdefff', image: 'assets/skins/frost.png', previewClass: 'skin-preview-image' },
+      { id: 'solar', labelKey: 'skin.solar', color: '#ffe780', image: 'assets/skins/solar.png', previewClass: 'skin-preview-image' },
     ];
 
     const stageSelectPanel = document.createElement('div');
@@ -254,7 +254,9 @@
         const unlocked = ownedSkins.includes(item.id);
         const active = unlocked && currentSkin === item.id;
         const preview = unlocked
-          ? `<span class="skin-preview ${item.previewClass || ''}" style="--skin-color:${item.color};"></span>`
+          ? item.image
+            ? `<span class="skin-preview skin-preview-image"><img src="${item.image}" alt="${t(item.labelKey)}" loading="lazy" decoding="async"></span>`
+            : `<span class="skin-preview ${item.previewClass || ''}" style="--skin-color:${item.color};"></span>`
           : `<span class="skin-preview skin-preview-locked">?</span>`;
         return `
           <button class="skin-card" type="button" data-skin-id="${item.id}" ${unlocked ? '' : 'disabled'}>
@@ -470,8 +472,14 @@
     function showSkinUnlockPopup(skinItem) {
       if (!skinItem) return;
       if (skinUnlockPreview) {
-        skinUnlockPreview.className = `skin-preview skin-unlock-preview ${skinItem.previewClass || ''}`;
-        skinUnlockPreview.style.setProperty('--skin-color', skinItem.color || '#fff');
+        if (skinItem.image) {
+          skinUnlockPreview.className = 'skin-preview skin-unlock-preview skin-preview-image';
+          skinUnlockPreview.innerHTML = `<img src="${skinItem.image}" alt="${t(skinItem.labelKey)}" loading="eager" decoding="async">`;
+        } else {
+          skinUnlockPreview.className = `skin-preview skin-unlock-preview ${skinItem.previewClass || ''}`;
+          skinUnlockPreview.innerHTML = '';
+          skinUnlockPreview.style.setProperty('--skin-color', skinItem.color || '#fff');
+        }
       }
       if (skinUnlockName) skinUnlockName.textContent = t('skin.unlock.congrats', { skin: t(skinItem.labelKey) });
       skinUnlockPopup.hidden = false;
