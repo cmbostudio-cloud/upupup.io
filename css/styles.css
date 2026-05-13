@@ -1418,3 +1418,43 @@ body {
 .settings-editor-access-btn:focus-visible {
   color: var(--ink);
 }
+
+.skin-unlock-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--modal-backdrop);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.skin-unlock-panel {
+  width: min(420px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 22px 18px 18px;
+  border: 1px solid rgba(var(--ink-rgb), 0.18);
+  border-radius: 16px;
+  background: var(--modal-surface);
+  color: var(--ink);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.14);
+  text-align: center;
+}
+
+.skin-unlock-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(var(--ink-rgb), 0.56);
+}
+
+.skin-unlock-title { font-family: var(--font-display); font-size: clamp(20px, 3vw, 28px); }
+.skin-unlock-desc { font-size: 13px; color: rgba(var(--ink-rgb), 0.62); }
+.skin-unlock-preview { width: 70px; height: 70px; border-radius: 16px; border: 2px solid rgba(var(--ink-rgb),0.24); }
+.skin-unlock-name { font-weight: 700; font-size: 16px; }
+.skin-unlock-confirm-btn { min-width: 140px; }
