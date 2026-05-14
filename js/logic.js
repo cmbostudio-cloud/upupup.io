@@ -325,21 +325,40 @@
       this.gfx.beginFill(this.ctx.theme?.inkSoft ?? 0x1a1a1a);
       this.gfx.drawRoundedRect(0, 0, this.size, this.size, this.ctx.PLAYER_RADIUS);
       this.gfx.endFill();
+
+      const innerX = this.ctx.PLAYER_BORDER;
+      const innerY = this.ctx.PLAYER_BORDER;
+      const innerSize = this.size - this.ctx.PLAYER_BORDER * 2;
+      const innerRadius = Math.max(0, this.ctx.PLAYER_RADIUS - this.ctx.PLAYER_BORDER);
+
+      if (!this.skinMask) {
+        this.skinMask = new PIXI.Graphics();
+        this.gfx.addChild(this.skinMask);
+      }
+      this.skinMask.clear();
+      this.skinMask.beginFill(0xffffff);
+      this.skinMask.drawRoundedRect(innerX, innerY, innerSize, innerSize, innerRadius);
+      this.skinMask.endFill();
+
       const skinImagePath = this.ctx.playerSkinImage;
       if (skinImagePath) {
-        const texture = PIXI.Texture.from(skinImagePath);
-        this.gfx.beginTextureFill({ texture });
+        if (!this.skinSprite) {
+          this.skinSprite = new PIXI.Sprite();
+          this.gfx.addChild(this.skinSprite);
+        }
+        this.skinSprite.texture = PIXI.Texture.from(skinImagePath);
+        this.skinSprite.x = innerX;
+        this.skinSprite.y = innerY;
+        this.skinSprite.width = innerSize;
+        this.skinSprite.height = innerSize;
+        this.skinSprite.mask = this.skinMask;
+        this.skinSprite.visible = true;
       } else {
+        if (this.skinSprite) this.skinSprite.visible = false;
         this.gfx.beginFill(this.ctx.playerFillOverride ?? this.color ?? this.ctx.theme?.playerFill ?? 0xffffff);
+        this.gfx.drawRoundedRect(innerX, innerY, innerSize, innerSize, innerRadius);
+        this.gfx.endFill();
       }
-      this.gfx.drawRoundedRect(
-        this.ctx.PLAYER_BORDER,
-        this.ctx.PLAYER_BORDER,
-        this.size - this.ctx.PLAYER_BORDER * 2,
-        this.size - this.ctx.PLAYER_BORDER * 2,
-        Math.max(0, this.ctx.PLAYER_RADIUS - this.ctx.PLAYER_BORDER)
-      );
-      this.gfx.endFill();
     }
 
     drawDots() {
