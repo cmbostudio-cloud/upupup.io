@@ -273,7 +273,9 @@
         return `
           <section class="skin-rarity-section">
             <h3 class="skin-rarity-title">${t(`skin.rarity.${rarity}`)} (${rarityWeights[rarity]}%)</h3>
-            ${cards || `<p class="menu-panel-empty-text">${t('empty')}</p>`}
+            ${cards
+    ? `<div class="skin-rarity-grid">${cards}</div>`
+    : `<p class="menu-panel-empty-text">${t('empty')}</p>`}
           </section>
         `;
       }).join('');
