@@ -23,6 +23,7 @@
     readStageEditorStage,
     unlockStage,
     getThemePalette,
+    readPrefs,
   } = window.UpUpUpShared;
 
   function startGame({ canvas, shell, initialSave, audio, mode = 'infinite', stage = 1 }) {
