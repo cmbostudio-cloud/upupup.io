@@ -1493,7 +1493,7 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: 12px;
-  border: 2px solid rgba(var(--ink-rgb), 0.18);
+  border: 0;
   background: radial-gradient(circle at 20% 12%, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 44%, rgba(255,255,255,0));
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(255,255,255,0.35);
 }
