@@ -37,6 +37,8 @@
       indigo: 0x6366f1,
       violet: 0xa855f7,
       frost: 0xcdefff,
+      aurora: 0xd4b5ff,
+      abyss: 0x3e1d6b,
       solar: 0xffe780,
     };
     const SKIN_IMAGES = {
