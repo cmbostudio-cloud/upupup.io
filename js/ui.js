@@ -121,8 +121,8 @@
       { id: 'indigo', labelKey: 'skin.indigo', color: '#6366f1', rarity: 'normal' },
       { id: 'violet', labelKey: 'skin.violet', color: '#a855f7', rarity: 'normal' },
       { id: 'frost', labelKey: 'skin.frost', color: '#cdefff', rarity: 'rare', image: 'assets/skins/frost.png', previewClass: 'skin-preview-image' },
-      { id: 'aurora', labelKey: 'skin.aurora', color: '#d4b5ff', rarity: 'epic' },
-      { id: 'abyss', labelKey: 'skin.abyss', color: '#3e1d6b', rarity: 'mythic' },
+      { id: 'aurora', labelKey: 'skin.aurora', color: '#d4b5ff', rarity: 'epic', image: 'assets/skins/aurora.png', previewClass: 'skin-preview-image' },
+      { id: 'abyss', labelKey: 'skin.abyss', color: '#3e1d6b', rarity: 'mythic', image: 'assets/skins/abyss.png', previewClass: 'skin-preview-image' },
       { id: 'solar', labelKey: 'skin.solar', color: '#ffe780', rarity: 'legendary', image: 'assets/skins/solar.png', previewClass: 'skin-preview-image' },
     ];
     const rarityOrder = ['normal', 'rare', 'epic', 'mythic', 'legendary'];
