@@ -949,7 +949,12 @@
     }
 
     let movingStickCooldown = 0;
-    let nextScheduledWindmillScore = 20;
+    const SCHEDULED_WINDMILL_INTERVAL_SCORE = 30;
+    const RANDOM_WINDMILL_UNLOCK_SCORE = 2000;
+    const RANDOM_WINDMILL_SCORE_WINDOW = 20;
+    const RANDOM_WINDMILL_MAX_IN_WINDOW = 2;
+    let nextScheduledWindmillScore = SCHEDULED_WINDMILL_INTERVAL_SCORE;
+    const recentRandomWindmillScores = [];
 
     function getAccentPlan(y) {
       const tier = getInfiniteDifficultyTier(y);
@@ -1039,14 +1044,40 @@
     }
 
 
+    function canSpawnRandomWindmillAtScore(score) {
+      const minScore = score - RANDOM_WINDMILL_SCORE_WINDOW;
+      let overlappingCount = 0;
+      for (const recentScore of recentRandomWindmillScores) {
+        if (recentScore >= minScore) overlappingCount += 1;
+      }
+      return overlappingCount < RANDOM_WINDMILL_MAX_IN_WINDOW;
+    }
+
+    function rememberRandomWindmillScore(score) {
+      recentRandomWindmillScores.push(score);
+      const minScore = score - RANDOM_WINDMILL_SCORE_WINDOW;
+      while (recentRandomWindmillScores.length > 0 && recentRandomWindmillScores[0] < minScore) {
+        recentRandomWindmillScores.shift();
+      }
+    }
+
     function spawnScheduledWindmillsBetween(upperY, lowerY) {
       if (mode !== 'infinite') return;
 
       while (true) {
-        const scheduledY = GROUND_Y - nextScheduledWindmillScore * GRID;
+        const scheduledScore = nextScheduledWindmillScore;
+        const scheduledY = GROUND_Y - scheduledScore * GRID;
         if (scheduledY > upperY || scheduledY <= lowerY) break;
-        spawnRandomWindmill(scheduledY, randRange(0.92, 1.08));
-        nextScheduledWindmillScore += 20;
+        if (scheduledScore < RANDOM_WINDMILL_UNLOCK_SCORE) {
+          spawnRandomWindmill(scheduledY, randRange(0.92, 1.08));
+        } else {
+          const randomChance = getWindmillSpawnChance(scheduledY);
+          if (rng.next() < randomChance && canSpawnRandomWindmillAtScore(scheduledScore)) {
+            spawnRandomWindmill(scheduledY, randRange(0.9, 1.1));
+            rememberRandomWindmillScore(scheduledScore);
+          }
+        }
+        nextScheduledWindmillScore += SCHEDULED_WINDMILL_INTERVAL_SCORE;
       }
     }
 
