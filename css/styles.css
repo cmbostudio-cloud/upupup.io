@@ -391,6 +391,20 @@ body {
   width: 100%;
 }
 
+.skin-rarity-section {
+  display: grid;
+  gap: 8px;
+}
+
+.skin-rarity-title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.skin-rarity-section .skin-card {
+  width: 100%;
+}
+
 .skin-card {
   border: 2px solid var(--border-soft);
   border-radius: 12px;
