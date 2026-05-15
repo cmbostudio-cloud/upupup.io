@@ -43,6 +43,8 @@
     };
     const SKIN_IMAGES = {
       frost: 'assets/skins/frost.png',
+      aurora: 'assets/skins/aurora.png',
+      abyss: 'assets/skins/abyss.png',
       solar: 'assets/skins/solar.png',
     };
     let { width: CANVAS_W, height: CANVAS_H } = getViewportSize();
