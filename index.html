@@ -56,6 +56,7 @@
                 <h3 class="shop-draw-title" data-i18n="shop.draw.skin.title">스킨 뽑기</h3>
                 <p class="shop-draw-price" data-i18n="shop.draw.price">100 크레딧</p>
                 <button id="shop-draw-skin-btn" class="panel-button secondary shop-draw-button" type="button" data-i18n="shop.draw.skin.cta">스킨 뽑기 (준비중)</button>
+                <p id="shop-draw-feedback" class="shop-draw-feedback" aria-live="polite"></p>
               </article>
               <article class="shop-draw-card" aria-label="Theme draw item">
                 <h3 class="shop-draw-title" data-i18n="shop.draw.theme.title">테마 뽑기</h3>
@@ -69,7 +70,10 @@
         <section id="menu-panel-skin" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-skin"
           data-menu-panel="skin" hidden>
           <div class="menu-panel-inner menu-panel-skin">
-            <h2 class="menu-panel-title" data-i18n="skin.title">스킨</h2>
+            <div class="skin-panel-head">
+              <h2 class="menu-panel-title" data-i18n="skin.title">스킨</h2>
+              <p id="skin-credit-balance" class="skin-credit-balance" aria-live="polite"></p>
+            </div>
             <div class="skin-subtablist" role="tablist" aria-label="Skin menu tabs">
               <button id="skin-subtab-skins" class="skin-subtab-button panel-button secondary" type="button" role="tab"
                 aria-selected="true" aria-controls="skin-panel-skins" data-skin-tab="skins" data-i18n="skin.skins">스킨</button>
