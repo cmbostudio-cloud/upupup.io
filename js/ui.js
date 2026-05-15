@@ -110,17 +110,19 @@
     const stageCount = 50;
     const skinDrawPrice = 100;
     const skinItems = [
-      { id: 'default', labelKey: 'skin.default', color: '#ffffff' },
-      { id: 'red', labelKey: 'skin.red', color: '#ef4444' },
-      { id: 'orange', labelKey: 'skin.orange', color: '#f97316' },
-      { id: 'yellow', labelKey: 'skin.yellow', color: '#eab308' },
-      { id: 'green', labelKey: 'skin.green', color: '#22c55e' },
-      { id: 'blue', labelKey: 'skin.blue', color: '#3b82f6' },
-      { id: 'indigo', labelKey: 'skin.indigo', color: '#6366f1' },
-      { id: 'violet', labelKey: 'skin.violet', color: '#a855f7' },
-      { id: 'frost', labelKey: 'skin.frost', color: '#cdefff', image: 'assets/skins/frost.png', previewClass: 'skin-preview-image' },
-      { id: 'solar', labelKey: 'skin.solar', color: '#ffe780', image: 'assets/skins/solar.png', previewClass: 'skin-preview-image' },
+      { id: 'default', labelKey: 'skin.default', color: '#ffffff', rarity: 'normal' },
+      { id: 'red', labelKey: 'skin.red', color: '#ef4444', rarity: 'normal' },
+      { id: 'orange', labelKey: 'skin.orange', color: '#f97316', rarity: 'normal' },
+      { id: 'yellow', labelKey: 'skin.yellow', color: '#eab308', rarity: 'normal' },
+      { id: 'green', labelKey: 'skin.green', color: '#22c55e', rarity: 'normal' },
+      { id: 'blue', labelKey: 'skin.blue', color: '#3b82f6', rarity: 'normal' },
+      { id: 'indigo', labelKey: 'skin.indigo', color: '#6366f1', rarity: 'normal' },
+      { id: 'violet', labelKey: 'skin.violet', color: '#a855f7', rarity: 'normal' },
+      { id: 'frost', labelKey: 'skin.frost', color: '#cdefff', rarity: 'rare', image: 'assets/skins/frost.png', previewClass: 'skin-preview-image' },
+      { id: 'solar', labelKey: 'skin.solar', color: '#ffe780', rarity: 'legendary', image: 'assets/skins/solar.png', previewClass: 'skin-preview-image' },
     ];
+    const rarityOrder = ['normal', 'rare', 'epic', 'mythic', 'legendary'];
+    const rarityWeights = { normal: 50, rare: 33, epic: 10, mythic: 5, legendary: 2 };
 
     const stageSelectPanel = document.createElement('div');
     stageSelectPanel.id = 'stage-select-panel';
@@ -250,7 +252,9 @@
 
     function renderSkinCollection() {
       if (!skinCollectionGrid) return;
-      skinCollectionGrid.innerHTML = skinItems.map((item) => {
+      skinCollectionGrid.innerHTML = rarityOrder.map((rarity) => {
+        const skins = skinItems.filter((item) => item.rarity === rarity);
+        const cards = skins.map((item) => {
         const unlocked = ownedSkins.includes(item.id);
         const active = unlocked && currentSkin === item.id;
         const preview = unlocked
@@ -258,12 +262,21 @@
             ? `<span class="skin-preview skin-preview-image"><img src="${item.image}" alt="${t(item.labelKey)}" loading="lazy" decoding="async"></span>`
             : `<span class="skin-preview ${item.previewClass || ''}" style="--skin-color:${item.color};"></span>`
           : `<span class="skin-preview skin-preview-locked">?</span>`;
-        return `
+          return `
           <button class="skin-card" type="button" data-skin-id="${item.id}" ${unlocked ? '' : 'disabled'}>
             ${preview}
             <span class="skin-card-title">${t(item.labelKey)}${active ? t('skin.activeSuffix') : ''}</span>
-            <span class="skin-card-meta">${unlocked ? t('skin.unlocked') : t('skin.locked')}</span>
+            <span class="skin-card-meta">${t(`skin.rarity.${rarity}`)} · ${unlocked ? t('skin.unlocked') : t('skin.locked')}</span>
           </button>
+        `;
+        }).join('');
+        return `
+          <section class="skin-rarity-section">
+            <h3 class="skin-rarity-title">${t(`skin.rarity.${rarity}`)} (${rarityWeights[rarity]}%)</h3>
+            ${cards
+    ? `<div class="skin-rarity-grid">${cards}</div>`
+    : `<p class="menu-panel-empty-text">${t('empty')}</p>`}
+          </section>
         `;
       }).join('');
       if (skinCollectionStatus) {
@@ -281,7 +294,22 @@
         setStatus(t('skin.notEnoughCredits', { price: skinDrawPrice }));
         return;
       }
-      const picked = locked[Math.floor(Math.random() * locked.length)];
+      const pool = rarityOrder.flatMap((rarity) => {
+        const candidate = locked.filter((item) => item.rarity === rarity);
+        if (!candidate.length) return [];
+        return [{ rarity, items: candidate, weight: rarityWeights[rarity] }];
+      });
+      const totalWeight = pool.reduce((sum, group) => sum + group.weight, 0);
+      let roll = Math.random() * totalWeight;
+      let selectedGroup = pool[pool.length - 1];
+      for (const group of pool) {
+        roll -= group.weight;
+        if (roll <= 0) {
+          selectedGroup = group;
+          break;
+        }
+      }
+      const picked = selectedGroup.items[Math.floor(Math.random() * selectedGroup.items.length)];
       ownedSkins = Array.from(new Set([...ownedSkins, picked.id]));
       currentSkin = picked.id;
       setCreditBalance(creditBalance - skinDrawPrice);
