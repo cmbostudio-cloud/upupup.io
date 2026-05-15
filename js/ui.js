@@ -285,17 +285,14 @@
     }
 
     function unlockRandomSkin() {
-      const locked = skinItems.filter((item) => item.id !== 'default' && !ownedSkins.includes(item.id));
-      if (locked.length === 0) {
-        setStatus(t('skin.allUnlocked'));
-        return;
-      }
+      const drawableSkins = skinItems.filter((item) => item.id !== 'default');
+      if (!drawableSkins.length) return;
       if (creditBalance < skinDrawPrice) {
         setStatus(t('skin.notEnoughCredits', { price: skinDrawPrice }));
         return;
       }
       const pool = rarityOrder.flatMap((rarity) => {
-        const candidate = locked.filter((item) => item.rarity === rarity);
+        const candidate = drawableSkins.filter((item) => item.rarity === rarity);
         if (!candidate.length) return [];
         return [{ rarity, items: candidate, weight: rarityWeights[rarity] }];
       });
@@ -310,12 +307,13 @@
         }
       }
       const picked = selectedGroup.items[Math.floor(Math.random() * selectedGroup.items.length)];
-      ownedSkins = Array.from(new Set([...ownedSkins, picked.id]));
+      const isDuplicate = ownedSkins.includes(picked.id);
+      if (!isDuplicate) ownedSkins = Array.from(new Set([...ownedSkins, picked.id]));
       currentSkin = picked.id;
       setCreditBalance(creditBalance - skinDrawPrice);
       persistSkinPrefs();
-      setStatus(t('skin.unlockedMessage', { skin: t(picked.labelKey) }));
-      showSkinUnlockPopup(picked);
+      setStatus(t(isDuplicate ? 'skin.duplicateMessage' : 'skin.unlockedMessage', { skin: t(picked.labelKey) }));
+      showSkinUnlockPopup(picked, { isDuplicate });
       window.dispatchEvent(new CustomEvent('upupup:skin-changed', { detail: { skinId: currentSkin } }));
       renderSkinCollection();
     }
@@ -497,7 +495,7 @@
       skinUnlockPopup.hidden = true;
     }
 
-    function showSkinUnlockPopup(skinItem) {
+    function showSkinUnlockPopup(skinItem, { isDuplicate = false } = {}) {
       if (!skinItem) return;
       if (skinUnlockPreview) {
         if (skinItem.image) {
@@ -509,7 +507,11 @@
           skinUnlockPreview.style.setProperty('--skin-color', skinItem.color || '#fff');
         }
       }
-      if (skinUnlockName) skinUnlockName.textContent = t('skin.unlock.congrats', { skin: t(skinItem.labelKey) });
+      const title = skinUnlockPopup.querySelector('#skin-unlock-title');
+      const desc = skinUnlockPopup.querySelector('#skin-unlock-desc');
+      if (title) title.textContent = t(isDuplicate ? 'skin.duplicate.title' : 'skin.unlock.title');
+      if (desc) desc.textContent = t(isDuplicate ? 'skin.duplicate.desc' : 'skin.unlock.desc');
+      if (skinUnlockName) skinUnlockName.textContent = t(isDuplicate ? 'skin.duplicate.congrats' : 'skin.unlock.congrats', { skin: t(skinItem.labelKey) });
       skinUnlockPopup.hidden = false;
     }
 
