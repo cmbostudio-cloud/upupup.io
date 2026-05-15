@@ -218,6 +218,11 @@
   function readPrefs() {
     const prefs = readJSONStorage(PREFS_KEY);
     const themeShop = readThemeShop();
+    const ownedSkins = Array.isArray(prefs?.ownedSkins)
+      ? Array.from(new Set(['default', ...prefs.ownedSkins.map((skinId) => String(skinId || '').toLowerCase()).filter(Boolean)]))
+      : ['default'];
+    const normalizedCurrentSkin = String(prefs?.currentSkin || 'default').toLowerCase();
+    const currentSkin = ownedSkins.includes(normalizedCurrentSkin) ? normalizedCurrentSkin : 'default';
     return {
       autoSaveEnabled: prefs?.autoSaveEnabled !== false,
       gridVisible: prefs?.gridVisible !== false,
@@ -225,10 +230,8 @@
         ? Math.max(0, Math.min(1, prefs.audioVolume))
         : 0.8,
       language: ['ko', 'en'].includes(prefs?.language) ? prefs.language : 'ko',
-      ownedSkins: Array.isArray(prefs?.ownedSkins)
-        ? Array.from(new Set(['default', ...prefs.ownedSkins.map((skinId) => String(skinId || '').toLowerCase()).filter(Boolean)]))
-        : ['default'],
-      currentSkin: typeof prefs?.currentSkin === 'string' ? prefs.currentSkin : 'default',
+      ownedSkins,
+      currentSkin,
       ...themeShop,
     };
   }
@@ -236,6 +239,14 @@
   function writePrefs(prefs, options = {}) {
     try {
       const current = readPrefs();
+      const ownedSkins = Array.isArray(prefs.ownedSkins)
+        ? Array.from(new Set(prefs.ownedSkins.map((skinId) => String(skinId || '').toLowerCase()).filter(Boolean)))
+        : current.ownedSkins;
+      if (!ownedSkins.includes('default')) ownedSkins.unshift('default');
+      const normalizedCurrentSkin = typeof prefs.currentSkin === 'string'
+        ? String(prefs.currentSkin).toLowerCase()
+        : current.currentSkin;
+      const currentSkin = ownedSkins.includes(normalizedCurrentSkin) ? normalizedCurrentSkin : 'default';
       writeJSONStorage(PREFS_KEY, {
         autoSaveEnabled:
           typeof prefs.autoSaveEnabled === 'boolean' ? prefs.autoSaveEnabled : current.autoSaveEnabled,
@@ -244,10 +255,8 @@
           ? Math.max(0, Math.min(1, prefs.audioVolume))
           : current.audioVolume,
         language: ['ko', 'en'].includes(prefs.language) ? prefs.language : current.language,
-        ownedSkins: Array.isArray(prefs.ownedSkins)
-          ? Array.from(new Set(prefs.ownedSkins.map((skinId) => String(skinId || '').toLowerCase()).filter(Boolean)))
-          : current.ownedSkins,
-        currentSkin: typeof prefs.currentSkin === 'string' ? prefs.currentSkin : current.currentSkin,
+        ownedSkins,
+        currentSkin,
       });
     } catch {
       return false;
