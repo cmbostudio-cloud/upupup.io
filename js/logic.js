@@ -322,14 +322,20 @@
 
     drawSquare() {
       this.gfx.clear();
-      this.gfx.beginFill(this.ctx.theme?.inkSoft ?? 0x1a1a1a);
-      this.gfx.drawRoundedRect(0, 0, this.size, this.size, this.ctx.PLAYER_RADIUS);
-      this.gfx.endFill();
 
-      const innerX = this.ctx.PLAYER_BORDER;
-      const innerY = this.ctx.PLAYER_BORDER;
-      const innerSize = this.size - this.ctx.PLAYER_BORDER * 2;
-      const innerRadius = Math.max(0, this.ctx.PLAYER_RADIUS - this.ctx.PLAYER_BORDER);
+      const skinImagePath = this.ctx.playerSkinImage;
+      const hasSkinImage = Boolean(skinImagePath);
+      const borderWidth = hasSkinImage ? 0 : this.ctx.PLAYER_BORDER;
+      const innerX = borderWidth;
+      const innerY = borderWidth;
+      const innerSize = this.size - borderWidth * 2;
+      const innerRadius = Math.max(0, this.ctx.PLAYER_RADIUS - borderWidth);
+
+      if (!hasSkinImage) {
+        this.gfx.beginFill(this.ctx.theme?.inkSoft ?? 0x1a1a1a);
+        this.gfx.drawRoundedRect(0, 0, this.size, this.size, this.ctx.PLAYER_RADIUS);
+        this.gfx.endFill();
+      }
 
       if (!this.skinMask) {
         this.skinMask = new PIXI.Graphics();
@@ -340,8 +346,7 @@
       this.skinMask.drawRoundedRect(innerX, innerY, innerSize, innerSize, innerRadius);
       this.skinMask.endFill();
 
-      const skinImagePath = this.ctx.playerSkinImage;
-      if (skinImagePath) {
+      if (hasSkinImage) {
         if (!this.skinSprite) {
           this.skinSprite = new PIXI.Sprite();
           this.gfx.addChild(this.skinSprite);
