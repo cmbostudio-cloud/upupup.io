@@ -39,8 +39,10 @@
     const shopThemeGrid = document.getElementById('shop-theme-grid');
     const shopThemeStatus = document.getElementById('shop-theme-status');
     const shopDrawSkinBtn = document.getElementById('shop-draw-skin-btn');
+    const shopDrawFeedback = document.getElementById('shop-draw-feedback');
     const skinCollectionStatus = document.getElementById('skin-collection-status');
     const skinCollectionGrid = document.getElementById('skin-collection-grid');
+    const skinCreditBalance = document.getElementById('skin-credit-balance');
     const skinSubtabButtons = Array.from(document.querySelectorAll('[data-skin-tab]'));
     const skinSubpanels = Array.from(document.querySelectorAll('[data-skin-panel]'));
     const gameTitle = gamePanel?.querySelector('.menu-title');
@@ -119,6 +121,8 @@
       { id: 'indigo', labelKey: 'skin.indigo', color: '#6366f1', rarity: 'normal' },
       { id: 'violet', labelKey: 'skin.violet', color: '#a855f7', rarity: 'normal' },
       { id: 'frost', labelKey: 'skin.frost', color: '#cdefff', rarity: 'rare', image: 'assets/skins/frost.png', previewClass: 'skin-preview-image' },
+      { id: 'aurora', labelKey: 'skin.aurora', color: '#d4b5ff', rarity: 'epic' },
+      { id: 'abyss', labelKey: 'skin.abyss', color: '#3e1d6b', rarity: 'mythic' },
       { id: 'solar', labelKey: 'skin.solar', color: '#ffe780', rarity: 'legendary', image: 'assets/skins/solar.png', previewClass: 'skin-preview-image' },
     ];
     const rarityOrder = ['normal', 'rare', 'epic', 'mythic', 'legendary'];
@@ -288,8 +292,13 @@
       const drawableSkins = skinItems.filter((item) => item.id !== 'default');
       if (!drawableSkins.length) return;
       if (creditBalance < skinDrawPrice) {
-        setStatus(t('skin.notEnoughCredits', { price: skinDrawPrice }));
+        if (shopDrawFeedback) {
+          shopDrawFeedback.textContent = t('skin.notEnoughCredits', { price: skinDrawPrice });
+        }
         return;
+      }
+      if (shopDrawFeedback) {
+        shopDrawFeedback.textContent = '';
       }
       const pool = rarityOrder.flatMap((rarity) => {
         const candidate = drawableSkins.filter((item) => item.rarity === rarity);
@@ -760,6 +769,9 @@
       creditBalance = numberOr(balance, 0);
       if (menuCreditBalance) {
         menuCreditBalance.textContent = t('credits.balance', { credits: creditBalance });
+      }
+      if (skinCreditBalance) {
+        skinCreditBalance.textContent = t('credits.balance', { credits: creditBalance });
       }
       renderThemeShop();
     }
