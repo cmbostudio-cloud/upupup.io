@@ -110,7 +110,7 @@
     let gameView = 'modes';
 
     const stageCount = 50;
-    const skinDrawPrice = 100;
+    const skinDrawPrice = 75;
     const skinItems = [
       { id: 'default', labelKey: 'skin.default', color: '#ffffff', rarity: 'normal' },
       { id: 'red', labelKey: 'skin.red', color: '#ef4444', rarity: 'normal' },
