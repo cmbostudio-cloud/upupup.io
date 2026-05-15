@@ -348,7 +348,9 @@
     }
 
     function getCreditValue(scoreValue = score) {
-      return 1 + Math.floor(Math.max(0, scoreValue - 1) / 50);
+      const infiniteBonus = 1 + Math.floor(Math.max(0, scoreValue - 1) / 100);
+      const skinBonus = String(readPrefs()?.currentSkin || '').toLowerCase() === 'solar' ? 2 : 1;
+      return infiniteBonus * skinBonus;
     }
 
     function updateScore(force = false) {

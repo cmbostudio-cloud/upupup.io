@@ -335,6 +335,9 @@ body {
   justify-items: center;
   gap: 14px;
   width: 100%;
+  max-height: min(56vh, 520px);
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .skin-subpanel[hidden] {
@@ -344,8 +347,22 @@ body {
 .skin-collection-grid {
   width: min(560px, 100%);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
+}
+
+.skin-rarity-section {
+  display: grid;
+  gap: 8px;
+}
+
+.skin-rarity-title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.skin-rarity-section .skin-card {
+  width: 100%;
 }
 
 .skin-card {
